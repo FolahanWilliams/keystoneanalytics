@@ -14,7 +14,8 @@ import {
   Brain,
   Globe,
   Menu,
-  X
+  X,
+  Award
 } from "lucide-react";
 import { NavLink, useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,6 +38,7 @@ const navItems = [
   { icon: BarChart3, label: "Analysis", path: "/dashboard/analysis" },
   { icon: Calculator, label: "Calculator", path: "/dashboard/calculator" },
   { icon: GraduationCap, label: "Learn", path: "/dashboard/learn" },
+  { icon: Award, label: "Academy", path: "/academy" },
   { icon: Settings, label: "Settings", path: "/dashboard/settings" },
 ];
 
