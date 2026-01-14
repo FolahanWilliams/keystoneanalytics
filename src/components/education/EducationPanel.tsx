@@ -13,11 +13,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useEducation, EDUCATIONAL_TOPICS, SkillLevel, EducationContext } from "@/hooks/useEducation";
+import { useEducation } from "@/hooks/useEducation";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import type { SkillLevel, EducationContext } from "@/types/education";
 
 interface EducationPanelProps {
   context?: EducationContext;
