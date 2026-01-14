@@ -12,9 +12,10 @@ import {
   Area,
 } from "recharts";
 import { useCandles, useQuotes } from "@/hooks/useMarketData";
-import { Loader2, TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { StockSearch } from "./StockSearch";
 
 interface CandlestickChartProps {
   symbol?: string;
@@ -25,6 +26,7 @@ const timeframes = ["1H", "4H", "1D", "1W", "1M"];
 
 const CandlestickChart = ({ symbol = "AAPL", onSymbolChange }: CandlestickChartProps) => {
   const [selectedTf, setSelectedTf] = useState("1D");
+  const [showSearch, setShowSearch] = useState(false);
   const { candles, loading, error, refetch } = useCandles(symbol);
   const { quotes } = useQuotes([symbol]);
   
@@ -56,6 +58,11 @@ const CandlestickChart = ({ symbol = "AAPL", onSymbolChange }: CandlestickChartP
     return { min: min - padding, max: max + padding };
   }, [chartData]);
 
+  const handleSymbolSelect = (newSymbol: string) => {
+    onSymbolChange?.(newSymbol);
+    setShowSearch(false);
+  };
+
   if (error) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-4">
@@ -72,44 +79,73 @@ const CandlestickChart = ({ symbol = "AAPL", onSymbolChange }: CandlestickChartP
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
-          <div>
-            <h2 className="text-xl font-bold font-mono flex items-center gap-2">
-              {symbol}
-              {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-            </h2>
-            <div className="flex items-center gap-3 mt-1">
-              <span className="text-2xl font-bold font-mono">
-                ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-              <span
-                className={cn(
-                  "flex items-center gap-1 text-sm font-mono px-2 py-0.5 rounded-md",
-                  isPositive ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"
-                )}
+          <div className="relative">
+            {showSearch ? (
+              <div className="w-64">
+                <StockSearch 
+                  onSelect={handleSymbolSelect}
+                  placeholder="Search stocks..."
+                  showInline
+                />
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowSearch(true)}
+                className="flex items-center gap-2 hover:bg-secondary/50 px-2 py-1 rounded-lg transition-colors group"
               >
-                {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                {isPositive ? "+" : ""}
-                {priceChangePercent.toFixed(2)}%
-              </span>
-            </div>
+                <h2 className="text-xl font-bold font-mono flex items-center gap-2">
+                  {symbol}
+                  {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                </h2>
+                <Search className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            )}
+            {!showSearch && (
+              <div className="flex items-center gap-3 mt-1">
+                <span className="text-2xl font-bold font-mono">
+                  ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                <span
+                  className={cn(
+                    "flex items-center gap-1 text-sm font-mono px-2 py-0.5 rounded-md",
+                    isPositive ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"
+                  )}
+                >
+                  {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                  {isPositive ? "+" : ""}
+                  {priceChangePercent.toFixed(2)}%
+                </span>
+              </div>
+            )}
           </div>
         </div>
         
-        <div className="flex gap-1">
-          {timeframes.map((tf) => (
-            <button
-              key={tf}
-              onClick={() => setSelectedTf(tf)}
-              className={cn(
-                "px-3 py-1.5 text-xs font-mono rounded-md transition-all",
-                selectedTf === tf
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {tf}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={refetch}
+            disabled={loading}
+            className="h-8 w-8"
+          >
+            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+          </Button>
+          <div className="flex gap-1">
+            {timeframes.map((tf) => (
+              <button
+                key={tf}
+                onClick={() => setSelectedTf(tf)}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-mono rounded-md transition-all",
+                  selectedTf === tf
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tf}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

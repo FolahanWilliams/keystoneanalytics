@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -6,7 +6,6 @@ export interface WatchlistItem {
   id: string;
   symbol: string;
   name: string;
-  // These are mock prices - would come from a real API
   price: number;
   change: number;
   changePercent: number;
@@ -15,29 +14,18 @@ export interface WatchlistItem {
   volume?: string;
 }
 
-// Mock price data - in production, fetch from a real API
-const mockPrices: Record<string, { price: number; change: number; changePercent: number; high24h: number; low24h: number; volume: string }> = {
-  BTC: { price: 45230.50, change: 1250.30, changePercent: 2.84, high24h: 45890, low24h: 43200, volume: "28.5B" },
-  ETH: { price: 2890.75, change: -45.20, changePercent: -1.54, high24h: 2950, low24h: 2820, volume: "15.2B" },
-  AAPL: { price: 182.63, change: 3.42, changePercent: 1.91, high24h: 184.50, low24h: 180.20, volume: "52.1M" },
-  TSLA: { price: 248.50, change: -8.75, changePercent: -3.40, high24h: 258.90, low24h: 245.30, volume: "98.3M" },
-  NVDA: { price: 875.28, change: 22.15, changePercent: 2.60, high24h: 882.50, low24h: 850.00, volume: "45.7M" },
-  SPY: { price: 478.92, change: 2.34, changePercent: 0.49, high24h: 480.10, low24h: 475.80, volume: "78.2M" },
-  AMZN: { price: 178.25, change: 4.50, changePercent: 2.59, high24h: 179.80, low24h: 173.50, volume: "42.8M" },
-  GOOGL: { price: 141.80, change: -1.20, changePercent: -0.84, high24h: 144.00, low24h: 140.50, volume: "28.5M" },
-};
-
-const defaultPrices = { price: 100, change: 0, changePercent: 0, high24h: 100, low24h: 100, volume: "0" };
-
 export function useWatchlist() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchWatchlist = async () => {
+  const fetchWatchlist = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from("watchlist")
@@ -47,27 +35,75 @@ export function useWatchlist() {
 
       if (error) throw error;
 
-      const itemsWithPrices: WatchlistItem[] = (data || []).map((item) => {
-        const prices = mockPrices[item.symbol] || defaultPrices;
-        return {
+      if (!data || data.length === 0) {
+        setWatchlist([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch real prices from our market-data edge function
+      const symbols = data.map(item => item.symbol);
+      
+      try {
+        const { data: priceData, error: priceError } = await supabase.functions.invoke("market-data", {
+          body: { symbols, type: "quotes" },
+        });
+
+        if (priceError) throw priceError;
+
+        const quotes = priceData?.quotes || [];
+        const priceMap: Record<string, any> = {};
+        quotes.forEach((q: any) => {
+          priceMap[q.symbol] = q;
+        });
+
+        const itemsWithPrices: WatchlistItem[] = data.map((item) => {
+          const quote = priceMap[item.symbol] || {};
+          return {
+            id: item.id,
+            symbol: item.symbol,
+            name: item.name,
+            price: quote.price || 0,
+            change: quote.change || 0,
+            changePercent: quote.changePercent || 0,
+            high24h: quote.high,
+            low24h: quote.low,
+          };
+        });
+
+        setWatchlist(itemsWithPrices);
+      } catch (priceErr) {
+        // If price fetch fails, still show watchlist with zero prices
+        console.error("Error fetching prices:", priceErr);
+        const itemsWithoutPrices: WatchlistItem[] = data.map((item) => ({
           id: item.id,
           symbol: item.symbol,
           name: item.name,
-          ...prices,
-        };
-      });
-
-      setWatchlist(itemsWithPrices);
+          price: 0,
+          change: 0,
+          changePercent: 0,
+        }));
+        setWatchlist(itemsWithoutPrices);
+      }
     } catch (error) {
       console.error("Error fetching watchlist:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchWatchlist();
-  }, []);
+
+    // Refresh prices every 30 seconds
+    const interval = setInterval(() => {
+      if (watchlist.length > 0) {
+        fetchWatchlist();
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchWatchlist]);
 
   const addToWatchlist = async (symbol: string, name: string) => {
     try {
@@ -76,7 +112,7 @@ export function useWatchlist() {
 
       const { error } = await supabase
         .from("watchlist")
-        .insert({ user_id: user.id, symbol, name });
+        .insert({ user_id: user.id, symbol: symbol.toUpperCase(), name });
 
       if (error) {
         if (error.code === "23505") {
