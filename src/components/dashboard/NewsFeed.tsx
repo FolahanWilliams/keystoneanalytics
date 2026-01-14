@@ -1,65 +1,8 @@
-import { Newspaper, TrendingUp, TrendingDown, Minus, ExternalLink } from "lucide-react";
+import { Newspaper, TrendingUp, TrendingDown, Minus, ExternalLink, Loader2, RefreshCw, Image } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface NewsItem {
-  id: string;
-  headline: string;
-  source: string;
-  timestamp: string;
-  sentiment: "bullish" | "bearish" | "neutral";
-  tickers: string[];
-}
-
-const mockNews: NewsItem[] = [
-  {
-    id: "1",
-    headline: "Fed signals potential rate cuts in 2024, markets rally on dovish outlook",
-    source: "Reuters",
-    timestamp: "2 min ago",
-    sentiment: "bullish",
-    tickers: ["SPY", "QQQ"],
-  },
-  {
-    id: "2",
-    headline: "Bitcoin surges past $45K as institutional adoption accelerates",
-    source: "CoinDesk",
-    timestamp: "15 min ago",
-    sentiment: "bullish",
-    tickers: ["BTC", "ETH"],
-  },
-  {
-    id: "3",
-    headline: "Tesla faces production challenges amid supply chain disruptions",
-    source: "Bloomberg",
-    timestamp: "32 min ago",
-    sentiment: "bearish",
-    tickers: ["TSLA"],
-  },
-  {
-    id: "4",
-    headline: "NVIDIA reports record quarterly revenue driven by AI chip demand",
-    source: "CNBC",
-    timestamp: "1 hr ago",
-    sentiment: "bullish",
-    tickers: ["NVDA"],
-  },
-  {
-    id: "5",
-    headline: "Oil prices stabilize as OPEC+ maintains production targets",
-    source: "Financial Times",
-    timestamp: "2 hrs ago",
-    sentiment: "neutral",
-    tickers: ["USO", "XLE"],
-  },
-  {
-    id: "6",
-    headline: "Apple announces major AI integration across product lineup",
-    source: "TechCrunch",
-    timestamp: "3 hrs ago",
-    sentiment: "bullish",
-    tickers: ["AAPL"],
-  },
-];
+import { useMarketNews, NewsItem } from "@/hooks/useMarketNews";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
 
 const getSentimentConfig = (sentiment: NewsItem["sentiment"]) => {
   switch (sentiment) {
@@ -67,19 +10,19 @@ const getSentimentConfig = (sentiment: NewsItem["sentiment"]) => {
       return {
         icon: TrendingUp,
         label: "Bullish",
-        className: "bg-gain/10 text-gain border-gain/20",
+        className: "bg-gain/15 text-gain border-gain/30",
       };
     case "bearish":
       return {
         icon: TrendingDown,
         label: "Bearish",
-        className: "bg-loss/10 text-loss border-loss/20",
+        className: "bg-loss/15 text-loss border-loss/30",
       };
     default:
       return {
         icon: Minus,
         label: "Neutral",
-        className: "bg-muted text-muted-foreground border-border",
+        className: "bg-muted/50 text-muted-foreground border-border",
       };
   }
 };
@@ -89,41 +32,107 @@ interface NewsFeedProps {
 }
 
 const NewsFeed = ({ compact = false }: NewsFeedProps) => {
-  const displayNews = compact ? mockNews.slice(0, 4) : mockNews;
+  const { news, loading, error, refetch } = useMarketNews("general");
+  const displayNews = compact ? news.slice(0, 5) : news;
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
+
+  const handleImageError = (id: string) => {
+    setImageErrors(prev => ({ ...prev, [id]: true }));
+  };
+
+  if (loading) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="flex items-center gap-2 mb-4">
+          <Newspaper className="w-4 h-4 text-primary" />
+          <h3 className="font-semibold">Market News</h3>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="flex items-center gap-2 mb-4">
+          <Newspaper className="w-4 h-4 text-primary" />
+          <h3 className="font-semibold">Market News</h3>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center gap-3">
+          <p className="text-muted-foreground text-sm">Failed to load news</p>
+          <Button variant="outline" size="sm" onClick={refetch} className="gap-2">
+            <RefreshCw className="w-4 h-4" /> Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center gap-2 mb-4">
-        <Newspaper className="w-4 h-4 text-primary" />
-        <h3 className="font-semibold">Market News</h3>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Newspaper className="w-4 h-4 text-primary" />
+          <h3 className="font-semibold">Market News</h3>
+        </div>
+        <button 
+          onClick={refetch}
+          className="p-1.5 rounded-md hover:bg-secondary/80 transition-colors"
+          title="Refresh news"
+        >
+          <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto scrollbar-terminal">
-        {displayNews.map((news) => {
-          const sentimentConfig = getSentimentConfig(news.sentiment);
+      <div className="flex-1 space-y-3 overflow-y-auto scrollbar-terminal pr-1">
+        {displayNews.map((item) => {
+          const sentimentConfig = getSentimentConfig(item.sentiment);
           const SentimentIcon = sentimentConfig.icon;
+          const hasImage = item.image && !imageErrors[item.id];
 
           return (
             <article
-              key={news.id}
-              className="group p-4 rounded-lg bg-card/50 border border-border/50 hover:border-primary/30 transition-all cursor-pointer"
+              key={item.id}
+              onClick={() => item.url && window.open(item.url, "_blank")}
+              className="group p-3 rounded-lg bg-card/30 border border-border/30 hover:border-primary/40 hover:bg-card/60 transition-all cursor-pointer"
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex gap-3">
+                {/* Thumbnail */}
+                {!compact && hasImage && (
+                  <div className="flex-shrink-0 w-20 h-16 rounded-md overflow-hidden bg-secondary/50">
+                    <img
+                      src={item.image}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      onError={() => handleImageError(item.id)}
+                    />
+                  </div>
+                )}
+                {!compact && !hasImage && (
+                  <div className="flex-shrink-0 w-20 h-16 rounded-md bg-secondary/30 flex items-center justify-center">
+                    <Image className="w-6 h-6 text-muted-foreground/30" />
+                  </div>
+                )}
+                
                 <div className="flex-1 min-w-0">
                   <h4 className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-                    {news.headline}
+                    {item.headline}
                   </h4>
                   
-                  <div className="flex items-center gap-3 mt-2">
-                    <span className="text-xs text-muted-foreground">{news.source}</span>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs text-muted-foreground">{item.source}</span>
                     <span className="text-xs text-muted-foreground">•</span>
-                    <span className="text-xs text-muted-foreground">{news.timestamp}</span>
+                    <span className="text-xs text-muted-foreground">{item.timestamp}</span>
+                    <ExternalLink className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-auto" />
                   </div>
                   
-                  <div className="flex items-center gap-2 mt-3">
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded border",
+                        "inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-md border",
                         sentimentConfig.className
                       )}
                     >
@@ -131,24 +140,30 @@ const NewsFeed = ({ compact = false }: NewsFeedProps) => {
                       {sentimentConfig.label}
                     </span>
                     
-                    <div className="flex gap-1">
-                      {news.tickers.map((ticker) => (
-                        <span
-                          key={ticker}
-                          className="px-1.5 py-0.5 text-xs font-mono bg-secondary rounded"
-                        >
-                          ${ticker}
-                        </span>
-                      ))}
-                    </div>
+                    {item.tickers.length > 0 && (
+                      <div className="flex gap-1">
+                        {item.tickers.slice(0, 2).map((ticker) => (
+                          <span
+                            key={ticker}
+                            className="px-1.5 py-0.5 text-xs font-mono bg-secondary/80 rounded text-muted-foreground"
+                          >
+                            ${ticker}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-                
-                <ExternalLink className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
               </div>
             </article>
           );
         })}
+        
+        {displayNews.length === 0 && (
+          <div className="flex-1 flex items-center justify-center py-8">
+            <p className="text-muted-foreground text-sm">No news available</p>
+          </div>
+        )}
       </div>
     </div>
   );
