@@ -4,9 +4,13 @@ import WatchlistWidget from "@/components/dashboard/WatchlistWidget";
 import NewsFeed from "@/components/dashboard/NewsFeed";
 import TechnicalIndicators from "@/components/dashboard/TechnicalIndicators";
 import { Activity, Zap, BarChart3 } from "lucide-react";
+import { useQuotes } from "@/hooks/useMarketData";
 
 const Overview = () => {
   const [selectedSymbol, setSelectedSymbol] = useState("AAPL");
+  const { quotes } = useQuotes([selectedSymbol]);
+  
+  const quote = quotes[0];
 
   return (
     <div className="space-y-6">
@@ -52,7 +56,11 @@ const Overview = () => {
           
           {/* Technical Indicators */}
           <div className="glass-panel rounded-xl p-6">
-            <TechnicalIndicators />
+            <TechnicalIndicators 
+              symbol={selectedSymbol} 
+              price={quote?.price} 
+              change={quote?.changePercent} 
+            />
           </div>
         </div>
 
@@ -60,7 +68,10 @@ const Overview = () => {
         <div className="lg:col-span-4 space-y-6">
           {/* Watchlist */}
           <div className="glass-panel rounded-xl p-5 h-[340px]">
-            <WatchlistWidget />
+            <WatchlistWidget 
+              onSelectSymbol={setSelectedSymbol} 
+              selectedSymbol={selectedSymbol}
+            />
           </div>
 
           {/* News Feed */}
