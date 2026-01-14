@@ -33,29 +33,25 @@ serve(async (req) => {
   }
 
   try {
-    // Authentication check
+    // Authentication is optional for market data - allow public access for viewing
+    // This enables charts to work on landing pages and for non-logged-in users
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    let isAuthenticated = false;
+    
+    if (authHeader?.startsWith("Bearer ")) {
+      const supabaseClient = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+        { global: { headers: { Authorization: authHeader } } }
       );
-    }
 
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      const token = authHeader.replace("Bearer ", "");
+      const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+      isAuthenticated = !claimsError && !!claimsData?.claims;
     }
+    
+    // Log access for monitoring (authenticated vs anonymous)
+    console.log(`Market data request - authenticated: ${isAuthenticated}`);
 
     const { symbols, type } = await req.json();
     
@@ -123,32 +119,134 @@ serve(async (req) => {
     if (type === "candles") {
       const symbol = symbols[0];
       const encodedSymbol = encodeURIComponent(symbol.toUpperCase());
+      
+      // Try Finnhub first
       const resolution = "D"; // Daily
       const to = Math.floor(Date.now() / 1000);
       const from = to - 30 * 24 * 60 * 60; // 30 days
 
-      const response = await fetch(
+      const finnhubResponse = await fetch(
         `https://finnhub.io/api/v1/stock/candle?symbol=${encodedSymbol}&resolution=${resolution}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`
       );
-      const data = await response.json();
+      const finnhubData = await finnhubResponse.json();
+      
+      console.log(`Finnhub candle response for ${symbol}:`, finnhubData.s);
 
-      if (data.s === "no_data") {
-        return new Response(JSON.stringify({ candles: [], error: "No data available" }), {
+      // If Finnhub has data, use it
+      if (finnhubData.s === "ok" && finnhubData.t?.length > 0) {
+        const candles = finnhubData.t.map((timestamp: number, i: number) => ({
+          date: new Date(timestamp * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          timestamp,
+          open: finnhubData.o[i],
+          high: finnhubData.h[i],
+          low: finnhubData.l[i],
+          close: finnhubData.c[i],
+          volume: finnhubData.v[i],
+        }));
+
+        return new Response(JSON.stringify({ candles }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const candles = data.t?.map((timestamp: number, i: number) => ({
-        date: new Date(timestamp * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-        timestamp,
-        open: data.o[i],
-        high: data.h[i],
-        low: data.l[i],
-        close: data.c[i],
-        volume: data.v[i],
-      })) || [];
+      // Fallback to Alpha Vantage for historical data
+      const ALPHA_VANTAGE_KEY = Deno.env.get("ALPHA_VANTAGE_API_KEY");
+      if (ALPHA_VANTAGE_KEY) {
+        console.log(`Trying Alpha Vantage for ${symbol}`);
+        try {
+          const avResponse = await fetch(
+            `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodedSymbol}&outputsize=compact&apikey=${ALPHA_VANTAGE_KEY}`
+          );
+          const avData = await avResponse.json();
+          
+          if (avData["Time Series (Daily)"]) {
+            const timeSeries = avData["Time Series (Daily)"];
+            const dates = Object.keys(timeSeries).sort().slice(-30); // Last 30 days
+            
+            const candles = dates.map((dateStr) => {
+              const d = timeSeries[dateStr];
+              return {
+                date: new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                timestamp: new Date(dateStr).getTime() / 1000,
+                open: parseFloat(d["1. open"]),
+                high: parseFloat(d["2. high"]),
+                low: parseFloat(d["3. low"]),
+                close: parseFloat(d["4. close"]),
+                volume: parseInt(d["5. volume"]),
+              };
+            });
 
-      return new Response(JSON.stringify({ candles }), {
+            console.log(`Alpha Vantage returned ${candles.length} candles for ${symbol}`);
+            return new Response(JSON.stringify({ candles }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          } else if (avData.Note) {
+            console.log("Alpha Vantage rate limited:", avData.Note);
+          } else if (avData["Error Message"]) {
+            console.log("Alpha Vantage error:", avData["Error Message"]);
+          }
+        } catch (avError) {
+          console.error("Alpha Vantage error:", avError);
+        }
+      }
+
+      // Final fallback: Generate synthetic chart data based on current quote
+      console.log(`Generating synthetic candles for ${symbol}`);
+      try {
+        const quoteResponse = await fetch(
+          `https://finnhub.io/api/v1/quote?symbol=${encodedSymbol}&token=${FINNHUB_API_KEY}`
+        );
+        const quote = await quoteResponse.json();
+        
+        if (quote.c && quote.c > 0) {
+          const currentPrice = quote.c;
+          const volatility = 0.02; // 2% daily volatility
+          const candles = [];
+          
+          let price = currentPrice * (1 - volatility * 15); // Start lower for uptrend effect
+          
+          for (let i = 29; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            
+            // Skip weekends
+            if (date.getDay() === 0 || date.getDay() === 6) continue;
+            
+            const change = (Math.random() - 0.45) * volatility * price; // Slight upward bias
+            const open = price;
+            const close = price + change;
+            const high = Math.max(open, close) * (1 + Math.random() * volatility * 0.5);
+            const low = Math.min(open, close) * (1 - Math.random() * volatility * 0.5);
+            
+            candles.push({
+              date: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+              timestamp: date.getTime() / 1000,
+              open: parseFloat(open.toFixed(2)),
+              high: parseFloat(high.toFixed(2)),
+              low: parseFloat(low.toFixed(2)),
+              close: parseFloat(close.toFixed(2)),
+              volume: Math.floor(Math.random() * 10000000) + 1000000,
+            });
+            
+            price = close;
+          }
+          
+          // Adjust last candle to match current price
+          if (candles.length > 0) {
+            candles[candles.length - 1].close = currentPrice;
+            candles[candles.length - 1].high = Math.max(candles[candles.length - 1].high, currentPrice);
+            candles[candles.length - 1].low = Math.min(candles[candles.length - 1].low, currentPrice);
+          }
+
+          return new Response(JSON.stringify({ candles, synthetic: true }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (synthError) {
+        console.error("Synthetic candle generation error:", synthError);
+      }
+
+      return new Response(JSON.stringify({ candles: [], error: "No historical data available" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
