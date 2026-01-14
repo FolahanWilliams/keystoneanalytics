@@ -29,10 +29,10 @@ function VolumeChartComponent({ data, height = 60 }: VolumeChartProps) {
   }, [data]);
 
   return (
-    <div className="border-t border-border/50 pt-1">
-      <div className="flex items-center justify-between px-2 mb-1">
-        <span className="text-xs font-medium text-muted-foreground">Volume</span>
-        <span className="text-xs font-mono text-muted-foreground">
+    <div className="-mt-1">
+      <div className="flex items-center justify-between px-2">
+        <span className="text-[10px] font-medium text-muted-foreground">Volume</span>
+        <span className="text-[10px] font-mono text-muted-foreground">
           {((data[data.length - 1]?.volume || 0) / 1000000).toFixed(2)}M
         </span>
       </div>

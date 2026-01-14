@@ -137,13 +137,13 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
       />
 
       {/* Chart Area */}
-      <div className="flex-1 min-h-0 mt-3">
+      <div className="flex-1 min-h-0 mt-2">
         {loading && enrichedData.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
         ) : (
-          <div className="h-full flex flex-col">
+          <div className="h-full flex flex-col gap-0">
             {/* Main price chart */}
             <div className="flex-1 min-h-0">
               <PriceChart
@@ -155,7 +155,7 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
               />
             </div>
 
-            {/* Volume chart */}
+            {/* Volume chart - tight coupling with price chart */}
             <VolumeChart data={enrichedData} height={50} />
 
             {/* RSI */}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { 
   Lock, 
   TrendingUp, 
@@ -10,15 +10,15 @@ import {
   BarChart3,
   Zap,
   Shield,
-  Eye
+  Eye,
+  Gift
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useDecisionEngineUsage } from "@/hooks/useDecisionEngineUsage";
 import { SubscriptionModal } from "@/components/premium/SubscriptionModal";
-import { supabase } from "@/integrations/supabase/client";
-import { useEffect } from "react";
 
 interface DecisionEngineVerdictProps {
   symbol: string;
@@ -62,21 +62,41 @@ function generateAnalysisData(symbol: string, price: number = 180, changePercent
 export function DecisionEngineVerdict({ 
   symbol, 
   price = 180, 
-  change = 2.45, 
   changePercent = 1.38 
 }: DecisionEngineVerdictProps) {
-  const { isPro, isElite, tier } = useSubscription();
+  const { isPro, isElite } = useSubscription();
+  const { 
+    remainingUses, 
+    hasReachedLimit, 
+    hasUsedForSymbol,
+    recordUsage, 
+    isLoading: usageLoading,
+    maxFreeUses 
+  } = useDecisionEngineUsage(symbol);
+  
   const [showModal, setShowModal] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [unlocked, setUnlocked] = useState(false);
   
   // Check if user is premium (pro or elite)
   const hasPremiumAccess = isPro || isElite;
   
+  // Determine if content should be shown
+  const shouldShowContent = hasPremiumAccess || unlocked || hasUsedForSymbol;
+
+  // Auto-unlock if previously used for this symbol
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setIsAuthenticated(!!data.user);
-    });
-  }, []);
+    if (hasUsedForSymbol && !unlocked) {
+      setUnlocked(true);
+    }
+  }, [hasUsedForSymbol, unlocked]);
+
+  // Handle unlock action
+  const handleUnlock = () => {
+    if (!hasReachedLimit) {
+      recordUsage();
+      setUnlocked(true);
+    }
+  };
 
   // Generate analysis data
   const analysis = useMemo(() => 
@@ -110,6 +130,16 @@ export function DecisionEngineVerdict({
               </p>
             </div>
           </div>
+          
+          {/* Show remaining uses for non-premium users */}
+          {!hasPremiumAccess && !usageLoading && (
+            <div className="flex items-center gap-1.5 text-[10px]">
+              <Gift className="w-3 h-3 text-primary" />
+              <span className="text-muted-foreground">
+                {remainingUses}/{maxFreeUses} free
+              </span>
+            </div>
+          )}
           
           {hasPremiumAccess && (
             <div className="text-[10px] text-muted-foreground">
@@ -156,12 +186,12 @@ export function DecisionEngineVerdict({
             </div>
           </div>
 
-          {/* Premium Content - Blurred for non-premium users */}
+          {/* Premium Content - Blurred for non-premium users without trial */}
           <div className="relative">
             {/* Blurred content */}
             <div className={cn(
               "space-y-3 transition-all duration-300",
-              !hasPremiumAccess && "blur-md select-none pointer-events-none"
+              !shouldShowContent && "blur-md select-none pointer-events-none"
             )}>
               {/* Rationale Section */}
               <div className="rounded-lg bg-secondary/30 p-3">
@@ -212,56 +242,96 @@ export function DecisionEngineVerdict({
               </div>
             </div>
 
-            {/* Premium Gate Overlay */}
-            {!hasPremiumAccess && (
+            {/* Gate Overlay - for users without access */}
+            {!shouldShowContent && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="glass-panel rounded-xl p-6 max-w-sm mx-4 text-center border-primary/30 shadow-xl shadow-primary/10">
-                  {/* Lock icon with glow */}
-                  <div className="w-14 h-14 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center mx-auto mb-4 animate-glow-pulse">
-                    <Lock className="w-7 h-7 text-primary" />
-                  </div>
-                  
-                  {/* Hook copy */}
-                  <h4 className="text-lg font-bold mb-2">
-                    Unlock the Professional Playbook
-                  </h4>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Our engine has identified <span className="text-primary font-semibold">3 key catalysts</span> for this ticker with a complete action plan.
-                  </p>
-                  
-                  {/* Progress bar showing locked content */}
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">Analysis Progress</span>
-                      <span className="text-primary font-medium">30%</span>
-                    </div>
-                    <Progress value={30} className="h-2" />
-                    <div className="text-[10px] text-muted-foreground mt-1">
-                      70% of analysis locked
-                    </div>
-                  </div>
-                  
-                  {/* CTA Button */}
-                  <Button 
-                    onClick={() => setShowModal(true)}
-                    className="w-full gap-2 bg-gradient-to-r from-primary to-emerald-500 hover:from-primary/90 hover:to-emerald-500/90 font-semibold"
-                  >
-                    Get Full Access - $19/mo
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                  
-                  {/* Trust microcopy */}
-                  <div className="mt-4 pt-4 border-t border-border/50">
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      <span className="font-semibold text-foreground">Stop interpreting data. Start executing strategy.</span>
-                      <br />
-                      Join 5,000+ disciplined investors using PulseTerminal.
-                    </p>
-                    <div className="flex items-center justify-center gap-1.5 mt-2 text-[10px] text-muted-foreground">
-                      <Shield className="w-3 h-3" />
-                      Cancel anytime • Bank-level security
-                    </div>
-                  </div>
+                <div className="glass-panel rounded-xl p-5 max-w-sm mx-4 text-center border-primary/30 shadow-xl shadow-primary/10">
+                  {/* Different display based on remaining uses */}
+                  {!hasReachedLimit ? (
+                    // Free trial available
+                    <>
+                      <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center mx-auto mb-3">
+                        <Gift className="w-6 h-6 text-primary" />
+                      </div>
+                      
+                      <h4 className="text-base font-bold mb-2">
+                        Try the Decision Engine Free
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Get <span className="text-primary font-semibold">{remainingUses} free analyses</span> to experience our AI-powered insights.
+                      </p>
+                      
+                      {/* Progress showing remaining uses */}
+                      <div className="mb-4">
+                        <Progress 
+                          value={(remainingUses / maxFreeUses) * 100} 
+                          className="h-2" 
+                        />
+                        <div className="text-[10px] text-muted-foreground mt-1">
+                          {remainingUses} of {maxFreeUses} free uses remaining
+                        </div>
+                      </div>
+                      
+                      {/* Unlock Button */}
+                      <Button 
+                        onClick={handleUnlock}
+                        className="w-full gap-2 bg-gradient-to-r from-primary to-emerald-500 hover:from-primary/90 hover:to-emerald-500/90 font-semibold"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        Unlock Analysis for {symbol}
+                      </Button>
+                      
+                      <p className="text-[10px] text-muted-foreground mt-3">
+                        No credit card required
+                      </p>
+                    </>
+                  ) : (
+                    // Free trial exhausted
+                    <>
+                      <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center mx-auto mb-3 animate-glow-pulse">
+                        <Lock className="w-6 h-6 text-primary" />
+                      </div>
+                      
+                      <h4 className="text-base font-bold mb-2">
+                        Unlock the Professional Playbook
+                      </h4>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        You've used all {maxFreeUses} free analyses. Upgrade to get unlimited access.
+                      </p>
+                      
+                      {/* Progress bar showing locked content */}
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-muted-foreground">Analysis Progress</span>
+                          <span className="text-primary font-medium">30%</span>
+                        </div>
+                        <Progress value={30} className="h-2" />
+                        <div className="text-[10px] text-muted-foreground mt-1">
+                          70% of analysis locked
+                        </div>
+                      </div>
+                      
+                      {/* CTA Button */}
+                      <Button 
+                        onClick={() => setShowModal(true)}
+                        className="w-full gap-2 bg-gradient-to-r from-primary to-emerald-500 hover:from-primary/90 hover:to-emerald-500/90 font-semibold"
+                      >
+                        Get Full Access - $19/mo
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                      
+                      {/* Trust microcopy */}
+                      <div className="mt-3 pt-3 border-t border-border/50">
+                        <p className="text-[10px] text-muted-foreground leading-relaxed">
+                          <span className="font-semibold text-foreground">Stop interpreting data. Start executing strategy.</span>
+                        </p>
+                        <div className="flex items-center justify-center gap-1.5 mt-1.5 text-[10px] text-muted-foreground">
+                          <Shield className="w-3 h-3" />
+                          Cancel anytime • Bank-level security
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             )}
