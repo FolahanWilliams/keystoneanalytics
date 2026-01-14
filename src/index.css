@@ -38,20 +38,24 @@
 
     /* Custom Pulse Terminal tokens */
     --gain: 142 71% 45%;
-    --loss: 0 84% 60%;
+    --loss: 0 72% 51%;
     --warning: 38 92% 50%;
     --info: 217 91% 60%;
     
     --chart-bg: 240 10% 4%;
-    --chart-grid: 240 5% 12%;
+    --chart-grid: 240 5% 15%;
     --chart-candle-up: 142 71% 45%;
     --chart-candle-down: 0 72% 51%;
     
-    --glow-green: 0 0% 0% / 0%;
-    --glow-red: 0 0% 0% / 0%;
+    --glow-green: 142 71% 45%;
+    --glow-red: 0 72% 51%;
     
     --terminal-green: 142 71% 45%;
     --terminal-amber: 45 93% 47%;
+    
+    /* Glass effect */
+    --glass-bg: 240 10% 6% / 0.8;
+    --glass-border: 240 5% 20% / 0.5;
 
     --sidebar-background: 240 10% 4%;
     --sidebar-foreground: 240 5% 65%;
@@ -120,17 +124,31 @@
 
 @layer components {
   .terminal-glow {
-    box-shadow: 0 0 20px hsl(var(--primary) / 0.15),
-                0 0 40px hsl(var(--primary) / 0.05);
+    box-shadow: 0 0 30px hsl(var(--primary) / 0.2),
+                0 0 60px hsl(var(--primary) / 0.1),
+                inset 0 1px 0 hsl(var(--primary) / 0.1);
   }
 
   .terminal-glow-red {
-    box-shadow: 0 0 20px hsl(var(--destructive) / 0.15),
-                0 0 40px hsl(var(--destructive) / 0.05);
+    box-shadow: 0 0 30px hsl(var(--destructive) / 0.2),
+                0 0 60px hsl(var(--destructive) / 0.1);
   }
 
   .glass-panel {
-    @apply bg-card/80 backdrop-blur-xl border border-border/50;
+    @apply bg-card/60 backdrop-blur-xl border border-border/40;
+    box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 hsl(var(--border) / 0.3);
+  }
+
+  .glass-panel-hover {
+    @apply glass-panel transition-all duration-300;
+  }
+
+  .glass-panel-hover:hover {
+    @apply border-primary/30;
+    box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.4),
+                0 0 20px hsl(var(--primary) / 0.1),
+                inset 0 1px 0 hsl(var(--primary) / 0.1);
   }
 
   .data-grid {
@@ -138,11 +156,20 @@
   }
 
   .ticker-positive {
-    @apply text-[hsl(var(--gain))] bg-[hsl(var(--gain)/0.1)];
+    @apply text-[hsl(var(--gain))] bg-[hsl(var(--gain)/0.15)];
   }
 
   .ticker-negative {
-    @apply text-[hsl(var(--loss))] bg-[hsl(var(--loss)/0.1)];
+    @apply text-[hsl(var(--loss))] bg-[hsl(var(--loss)/0.15)];
+  }
+
+  .stat-card {
+    @apply glass-panel rounded-xl p-4 transition-all duration-300;
+  }
+
+  .stat-card:hover {
+    @apply border-primary/20;
+    transform: translateY(-2px);
   }
 
   .pulse-dot {
