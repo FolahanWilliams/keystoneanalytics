@@ -176,6 +176,7 @@ export function PriceChart({
               stroke="transparent"
               fill="url(#bbFillGradient)"
               connectNulls
+              isAnimationActive={false}
             />
             <Line
               type="monotone"
@@ -185,6 +186,7 @@ export function PriceChart({
               dot={false}
               opacity={0.6}
               connectNulls
+              isAnimationActive={false}
             />
             <Line
               type="monotone"
@@ -195,6 +197,7 @@ export function PriceChart({
               dot={false}
               opacity={0.4}
               connectNulls
+              isAnimationActive={false}
             />
             <Line
               type="monotone"
@@ -204,18 +207,20 @@ export function PriceChart({
               dot={false}
               opacity={0.6}
               connectNulls
+              isAnimationActive={false}
             />
           </>
         )}
-        
+
         {/* Area fill under close price */}
         <Area
           type="monotone"
           dataKey="close"
           stroke="transparent"
           fill="url(#priceAreaGradient)"
+          isAnimationActive={false}
         />
-        
+
         {/* Moving averages */}
         {indicators.find(i => i.id === "sma20")?.enabled && (
           <Line
@@ -225,9 +230,10 @@ export function PriceChart({
             strokeWidth={1.5}
             dot={false}
             connectNulls
+            isAnimationActive={false}
           />
         )}
-        
+
         {indicators.find(i => i.id === "sma50")?.enabled && (
           <Line
             type="monotone"
@@ -236,9 +242,10 @@ export function PriceChart({
             strokeWidth={1.5}
             dot={false}
             connectNulls
+            isAnimationActive={false}
           />
         )}
-        
+
         {indicators.find(i => i.id === "ema12")?.enabled && (
           <Line
             type="monotone"
@@ -247,9 +254,10 @@ export function PriceChart({
             strokeWidth={1.5}
             dot={false}
             connectNulls
+            isAnimationActive={false}
           />
         )}
-        
+
         {indicators.find(i => i.id === "ema26")?.enabled && (
           <Line
             type="monotone"
@@ -258,9 +266,10 @@ export function PriceChart({
             strokeWidth={1.5}
             dot={false}
             connectNulls
+            isAnimationActive={false}
           />
         )}
-        
+
         {indicators.find(i => i.id === "vwap")?.enabled && (
           <Line
             type="monotone"
@@ -270,24 +279,26 @@ export function PriceChart({
             strokeDasharray="6 3"
             dot={false}
             connectNulls
+            isAnimationActive={false}
           />
         )}
-        
+
         {/* Candlestick bars */}
         <Bar
           dataKey="body"
           barSize={Math.max(4, Math.min(12, 600 / data.length))}
+          isAnimationActive={false}
           shape={(props: any) => {
             const { x, y, width, height, payload } = props;
             if (!payload) return null;
-            
+
             const fill = payload.isUp ? 'hsl(142, 71%, 45%)' : 'hsl(0, 72%, 51%)';
             const barHeight = (priceRange.max - priceRange.min);
             const chartHeight = props.background?.height || 300;
-            
+
             const wickTop = chartHeight * (1 - (payload.high - priceRange.min) / barHeight);
             const wickBottom = chartHeight * (1 - (payload.low - priceRange.min) / barHeight);
-            
+
             return (
               <g>
                 {/* Wick */}
