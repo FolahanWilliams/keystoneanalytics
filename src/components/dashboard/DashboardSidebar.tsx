@@ -11,7 +11,8 @@ import {
   BarChart3,
   GraduationCap,
   Crown,
-  Brain
+  Brain,
+  Globe
 } from "lucide-react";
 import { NavLink, useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +24,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 const navItems = [
   { icon: LayoutDashboard, label: "Overview", path: "/dashboard" },
   { icon: Brain, label: "AI Coach", path: "/dashboard/coach", highlight: true },
+  { icon: Globe, label: "Macro", path: "/dashboard/macro" },
   { icon: Star, label: "Watchlist", path: "/dashboard/watchlist" },
   { icon: Newspaper, label: "News", path: "/dashboard/news" },
   { icon: BarChart3, label: "Analysis", path: "/dashboard/analysis" },
