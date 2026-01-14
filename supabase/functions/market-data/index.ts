@@ -28,8 +28,8 @@ function validateType(type: unknown): type is "quotes" | "candles" | "search" {
 }
 
 // ======================= In-memory candle cache =======================
-// TTL in milliseconds – keep cached data for 2 minutes to balance freshness vs speed
-const CACHE_TTL_MS = 2 * 60 * 1000;
+// TTL in milliseconds – keep cached data for 30 seconds to allow quick timeframe switching
+const CACHE_TTL_MS = 30 * 1000;
 
 interface CacheEntry {
   data: unknown;
