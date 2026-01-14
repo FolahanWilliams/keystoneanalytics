@@ -8,7 +8,8 @@ import {
   Shield, 
   Zap,
   ChevronRight,
-  Activity
+  Activity,
+  Sparkles
 } from "lucide-react";
 
 const Landing = () => {
@@ -26,11 +27,16 @@ const Landing = () => {
 
       {/* Navigation */}
       <nav className="relative z-10 flex items-center justify-between px-6 py-4 lg:px-12">
-        <div className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <Activity className="w-8 h-8 text-primary" />
           <span className="text-xl font-bold tracking-tight">Pulse Terminal</span>
-        </div>
+        </Link>
         <div className="flex items-center gap-4">
+          <Link to="/pricing">
+            <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+              Pricing
+            </Button>
+          </Link>
           <Link to="/auth">
             <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
               Sign In
@@ -49,6 +55,7 @@ const Landing = () => {
         <div className="inline-flex items-center gap-2 px-4 py-2 mb-8 text-sm border rounded-full bg-secondary/50 border-border text-muted-foreground animate-fade-in">
           <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
           Live Market Data
+          <Sparkles className="w-3.5 h-3.5 text-primary" />
         </div>
 
         <h1 className="max-w-4xl text-4xl font-bold tracking-tight sm:text-6xl lg:text-7xl animate-fade-in">
@@ -67,9 +74,11 @@ const Landing = () => {
               Launch Terminal <TrendingUp className="w-5 h-5" />
             </Button>
           </Link>
-          <Button size="lg" variant="outline" className="gap-2 h-12 text-base border-border hover:bg-secondary">
-            View Demo
-          </Button>
+          <Link to="/pricing">
+            <Button size="lg" variant="outline" className="gap-2 h-12 text-base border-border hover:bg-secondary">
+              View Pricing
+            </Button>
+          </Link>
         </div>
 
         {/* Stats */}
@@ -130,9 +139,9 @@ const Landing = () => {
             ].map((feature) => (
               <div
                 key={feature.title}
-                className="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-primary/50 transition-all duration-300 hover:terminal-glow"
+                className="group p-6 rounded-xl bg-card/50 border border-border/50 hover:border-primary/50 transition-all duration-300 hover:terminal-glow cursor-pointer"
               >
-                <feature.icon className="w-10 h-10 mb-4 text-primary" />
+                <feature.icon className="w-10 h-10 mb-4 text-primary group-hover:scale-110 transition-transform" />
                 <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
                 <p className="text-sm text-muted-foreground">{feature.description}</p>
               </div>
@@ -158,12 +167,13 @@ const Landing = () => {
 
       {/* Footer */}
       <footer className="relative z-10 px-6 py-8 border-t border-border/50">
-        <div className="flex items-center justify-between max-w-6xl mx-auto">
+        <div className="flex flex-col sm:flex-row items-center justify-between max-w-6xl mx-auto gap-4">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Activity className="w-5 h-5" />
             <span className="text-sm">© 2026 Pulse Terminal</span>
           </div>
           <div className="flex gap-6 text-sm text-muted-foreground">
+            <Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
             <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
             <a href="#" className="hover:text-foreground transition-colors">Terms</a>
             <a href="#" className="hover:text-foreground transition-colors">Contact</a>

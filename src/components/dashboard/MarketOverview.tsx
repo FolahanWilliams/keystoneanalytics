@@ -2,12 +2,18 @@ import { TrendingUp, TrendingDown, Clock, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuotes } from "@/hooks/useMarketData";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 const MARKET_SYMBOLS = ["AAPL", "GOOGL", "MSFT", "AMZN", "NVDA", "TSLA", "META", "SPY"];
 
-const MarketOverview = () => {
+interface MarketOverviewProps {
+  onSymbolClick?: (symbol: string) => void;
+}
+
+const MarketOverview = ({ onSymbolClick }: MarketOverviewProps) => {
   const { quotes, loading, refetch } = useQuotes(MARKET_SYMBOLS);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const navigate = useNavigate();
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -21,6 +27,15 @@ const MarketOverview = () => {
   const isWeekend = day === 0 || day === 6;
   const isMarketHours = !isWeekend && hours >= 9.5 && hours < 16;
 
+  const handleSymbolClick = (symbol: string) => {
+    if (onSymbolClick) {
+      onSymbolClick(symbol);
+    } else {
+      // Navigate to dashboard with symbol
+      navigate(`/dashboard?symbol=${symbol}`);
+    }
+  };
+
   return (
     <div className="w-full border-b border-border/50 bg-card/30 backdrop-blur-sm">
       <div className="flex items-center justify-between px-6 py-2.5">
@@ -30,9 +45,10 @@ const MarketOverview = () => {
               const isPositive = quote.change >= 0;
               
               return (
-                <div 
+                <button 
                   key={quote.symbol} 
-                  className="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-secondary/50 transition-colors whitespace-nowrap cursor-pointer"
+                  onClick={() => handleSymbolClick(quote.symbol)}
+                  className="flex items-center gap-2 px-3 py-1 rounded-md hover:bg-secondary/50 active:bg-secondary/70 transition-colors whitespace-nowrap cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50"
                 >
                   <span className="text-xs font-medium text-muted-foreground">{quote.symbol}</span>
                   <span className="font-mono text-xs font-semibold">
@@ -52,7 +68,7 @@ const MarketOverview = () => {
                     {isPositive ? "+" : ""}
                     {quote.changePercent.toFixed(2)}%
                   </span>
-                </div>
+                </button>
               );
             })
           ) : (
@@ -72,7 +88,7 @@ const MarketOverview = () => {
             onClick={refetch}
             disabled={loading}
             className={cn(
-              "p-1 rounded hover:bg-secondary/50 transition-colors",
+              "p-1.5 rounded-md hover:bg-secondary/50 active:bg-secondary/70 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50",
               loading && "animate-spin"
             )}
             title="Refresh data"
