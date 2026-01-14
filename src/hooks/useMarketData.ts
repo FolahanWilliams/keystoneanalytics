@@ -71,7 +71,18 @@ export function useQuotes(symbols: string[]) {
   return { quotes, loading, error, refetch: fetchQuotes };
 }
 
-export function useCandles(symbol: string) {
+export type TimeframeType = "1H" | "4H" | "1D" | "1W" | "1M";
+
+// Map timeframes to API parameters
+const timeframeConfig: Record<TimeframeType, { resolution: string; days: number }> = {
+  "1H": { resolution: "60", days: 2 },      // 1-hour candles, 2 days of data
+  "4H": { resolution: "240", days: 7 },     // 4-hour candles, 7 days of data  
+  "1D": { resolution: "D", days: 30 },      // Daily candles, 30 days
+  "1W": { resolution: "W", days: 180 },     // Weekly candles, 6 months
+  "1M": { resolution: "M", days: 365 },     // Monthly candles, 1 year
+};
+
+export function useCandles(symbol: string, timeframe: TimeframeType = "1D") {
   const [candles, setCandles] = useState<Candle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -86,8 +97,15 @@ export function useCandles(symbol: string) {
     try {
       setLoading(true);
       setError(null);
+      
+      const config = timeframeConfig[timeframe];
       const { data, error: fnError } = await supabase.functions.invoke("market-data", {
-        body: { symbols: [symbol], type: "candles" },
+        body: { 
+          symbols: [symbol], 
+          type: "candles",
+          resolution: config.resolution,
+          days: config.days,
+        },
       });
 
       if (fnError) throw fnError;
@@ -100,7 +118,7 @@ export function useCandles(symbol: string) {
     } finally {
       setLoading(false);
     }
-  }, [symbol]);
+  }, [symbol, timeframe]);
 
   useEffect(() => {
     fetchCandles();
