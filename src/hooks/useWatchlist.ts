@@ -17,10 +17,12 @@ export interface WatchlistItem {
 export function useWatchlist() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchWatchlist = useCallback(async () => {
     try {
+      setError(null);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setLoading(false);
@@ -85,8 +87,9 @@ export function useWatchlist() {
         }));
         setWatchlist(itemsWithoutPrices);
       }
-    } catch (error) {
-      console.error("Error fetching watchlist:", error);
+    } catch (err) {
+      console.error("Error fetching watchlist:", err);
+      setError(err instanceof Error ? err.message : "Failed to load watchlist");
     } finally {
       setLoading(false);
     }
@@ -174,6 +177,7 @@ export function useWatchlist() {
   return {
     watchlist,
     loading,
+    error,
     addToWatchlist,
     removeFromWatchlist,
     refetch: fetchWatchlist,

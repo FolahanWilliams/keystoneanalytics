@@ -1,4 +1,4 @@
-import { Star, TrendingUp, TrendingDown, Plus, Loader2, Trash2 } from "lucide-react";
+import { Star, TrendingUp, TrendingDown, Plus, Loader2, Trash2, AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useWatchlist } from "@/hooks/useWatchlist";
@@ -10,12 +10,25 @@ interface WatchlistWidgetProps {
 }
 
 const WatchlistWidget = ({ onSelectSymbol, selectedSymbol }: WatchlistWidgetProps) => {
-  const { watchlist, loading, addToWatchlist, removeFromWatchlist } = useWatchlist();
+  const { watchlist, loading, error, addToWatchlist, removeFromWatchlist, refetch } = useWatchlist();
 
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-center p-4">
+        <AlertTriangle className="w-8 h-8 text-destructive/50 mb-3" />
+        <p className="text-sm text-muted-foreground mb-3">Failed to load watchlist</p>
+        <Button variant="outline" size="sm" onClick={refetch} className="gap-2">
+          <RefreshCw className="w-4 h-4" />
+          Retry
+        </Button>
       </div>
     );
   }
