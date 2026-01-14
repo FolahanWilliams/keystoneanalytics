@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Lightbulb, ChevronDown, ChevronUp, Sparkles, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { EducationPopover } from "./EducationTooltip";
-import { EducationContext } from "@/hooks/useEducation";
 import { cn } from "@/lib/utils";
+import { EducationPopover } from "./EducationTooltip";
+import type { EducationContext } from "@/types/education";
 
 interface IndicatorExplainerProps {
   indicator: "rsi" | "macd" | "volume" | "bollinger_bands" | "moving_average";
@@ -86,7 +86,6 @@ function analyzeIndicator(indicator: string, value: number): IndicatorAnalysis {
       }
 
     case "volume":
-      // Assuming value is relative to average (1 = average)
       if (value > 1.5) {
         return {
           status: "neutral",

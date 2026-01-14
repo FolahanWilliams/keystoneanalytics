@@ -4,9 +4,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { EducationTooltip } from "@/components/education/EducationTooltip";
-import { EducationPopover } from "@/components/education/EducationTooltip";
+import { EducationTooltip, EducationPopover } from "@/components/education/EducationTooltip";
 import { Link } from "react-router-dom";
+import type { EducationContext } from "@/types/education";
 
 interface Indicator {
   id: string;
@@ -38,24 +38,6 @@ const getSignalConfig = (signal: Indicator["signal"]) => {
   }
 };
 
-const getSignalExplanation = (indicator: Indicator): string => {
-  const { signal, shortName, value } = indicator;
-  
-  if (indicator.id === "rsi") {
-    if (value >= 70) return `${shortName} at ${value.toFixed(1)} indicates overbought conditions - potential pullback ahead`;
-    if (value <= 30) return `${shortName} at ${value.toFixed(1)} indicates oversold conditions - potential bounce opportunity`;
-    if (value > 50) return `${shortName} at ${value.toFixed(1)} shows bullish momentum`;
-    return `${shortName} at ${value.toFixed(1)} shows bearish momentum`;
-  }
-  
-  if (indicator.id === "macd") {
-    if (value > 0) return `${shortName} positive at ${value.toFixed(1)} - bullish momentum`;
-    return `${shortName} negative at ${value.toFixed(1)} - bearish momentum`;
-  }
-  
-  return `${shortName} generating ${signal} signal`;
-};
-
 interface TechnicalIndicatorsProps {
   symbol?: string;
   price?: number;
@@ -77,7 +59,7 @@ const TechnicalIndicators = ({ symbol = "AAPL", price, change }: TechnicalIndica
   const buySignals = indicators.filter((i) => i.enabled && i.signal === "buy").length;
   const sellSignals = indicators.filter((i) => i.enabled && i.signal === "sell").length;
 
-  const educationContext = { symbol, price, change };
+  const educationContext: EducationContext = { symbol, price, change };
 
   return (
     <div className="h-full flex flex-col">

@@ -10,10 +10,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { QUICK_EXPLANATIONS, useEducation, EducationContext, SkillLevel } from "@/hooks/useEducation";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import type { SkillLevel, EducationContext } from "@/types/education";
+import { QUICK_EXPLANATIONS } from "@/types/education";
 
 interface EducationTooltipProps {
   topic: string;
@@ -75,15 +77,30 @@ export function EducationPopover({
 }: EducationPopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [fullContent, setFullContent] = useState<string | null>(null);
-  const { fetchExplanation, isLoading } = useEducation();
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
   const quickExplanation = QUICK_EXPLANATIONS[topic];
 
   const handleOpenChange = async (open: boolean) => {
     setIsOpen(open);
     if (open && !fullContent) {
-      const result = await fetchExplanation(topic, context, level);
-      if (result) {
-        setFullContent(result.content);
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke("education", {
+          body: { topic, context, level },
+        });
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
+        setFullContent(data.content);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load explanation";
+        toast({
+          variant: "destructive",
+          title: "Education Error",
+          description: message,
+        });
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -156,3 +173,6 @@ export function EducationPopover({
     </Popover>
   );
 }
+
+// Re-export types for convenience
+export type { EducationContext } from "@/types/education";
