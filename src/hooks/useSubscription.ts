@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export type SubscriptionTier = "free" | "pro" | "elite";
 
@@ -15,6 +16,12 @@ export interface Subscription {
   created_at: string;
   updated_at: string;
 }
+
+// Stripe price IDs for each tier
+export const STRIPE_PRICES = {
+  pro: "price_1SpbFWGC4ILz5tue0ZckENCS",
+  elite: "price_1SpbFxGC4ILz5tueYZ34WXXO",
+} as const;
 
 export const TIER_LIMITS = {
   free: {
@@ -50,6 +57,9 @@ export const TIER_LIMITS = {
 } as const;
 
 export function useSubscription() {
+  const queryClient = useQueryClient();
+
+  // Fetch subscription from database
   const { data: subscription, isLoading, error, refetch } = useQuery({
     queryKey: ["subscription"],
     queryFn: async () => {
@@ -63,7 +73,6 @@ export function useSubscription() {
         .single();
 
       if (error) {
-        // If no subscription found, user is on free tier
         if (error.code === "PGRST116") {
           return { tier: "free" as SubscriptionTier } as Subscription;
         }
@@ -72,7 +81,61 @@ export function useSubscription() {
 
       return data as Subscription;
     },
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Sync subscription status with Stripe
+  const syncSubscription = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("check-subscription");
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subscription"] });
+    },
+    onError: (error) => {
+      console.error("Failed to sync subscription:", error);
+    },
+  });
+
+  // Create checkout session
+  const createCheckout = useMutation({
+    mutationFn: async (priceId: string) => {
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: { priceId },
+      });
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.open(data.url, "_blank");
+      }
+    },
+    onError: (error) => {
+      toast.error(`Checkout failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    },
+  });
+
+  // Open customer portal
+  const openPortal = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("customer-portal");
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.open(data.url, "_blank");
+      }
+    },
+    onError: (error) => {
+      toast.error(`Portal failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    },
   });
 
   const tier = subscription?.tier || "free";
@@ -87,7 +150,7 @@ export function useSubscription() {
   const isWithinLimit = (feature: keyof typeof TIER_LIMITS.free, currentCount: number) => {
     const limit = limits[feature];
     if (typeof limit === "boolean") return limit;
-    if (limit === -1) return true; // unlimited
+    if (limit === -1) return true;
     return currentCount < limit;
   };
 
@@ -102,5 +165,12 @@ export function useSubscription() {
     isWithinLimit,
     isPro: tier === "pro" || tier === "elite",
     isElite: tier === "elite",
+    // Stripe methods
+    syncSubscription: syncSubscription.mutate,
+    isSyncing: syncSubscription.isPending,
+    createCheckout: createCheckout.mutate,
+    isCheckoutLoading: createCheckout.isPending,
+    openPortal: openPortal.mutate,
+    isPortalLoading: openPortal.isPending,
   };
 }
