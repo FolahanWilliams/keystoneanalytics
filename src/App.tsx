@@ -13,6 +13,7 @@ import News from "./pages/dashboard/News";
 import Analysis from "./pages/dashboard/Analysis";
 import CalculatorPage from "./pages/dashboard/CalculatorPage";
 import Settings from "./pages/dashboard/Settings";
+import Learn from "./pages/dashboard/Learn";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="analysis" element={<Analysis />} />
             <Route path="calculator" element={<CalculatorPage />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="learn" element={<Learn />} />
           </Route>
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

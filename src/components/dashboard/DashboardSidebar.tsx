@@ -8,7 +8,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Calculator,
-  BarChart3
+  BarChart3,
+  GraduationCap
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,7 @@ const navItems = [
   { icon: Newspaper, label: "News", path: "/dashboard/news" },
   { icon: BarChart3, label: "Analysis", path: "/dashboard/analysis" },
   { icon: Calculator, label: "Calculator", path: "/dashboard/calculator" },
+  { icon: GraduationCap, label: "Learn", path: "/dashboard/learn" },
   { icon: Settings, label: "Settings", path: "/dashboard/settings" },
 ];
 
