@@ -1,23 +1,84 @@
-import { Settings as SettingsIcon, User, Bell, Shield, Palette } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Settings as SettingsIcon, User, Bell, Shield, Palette, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
-import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 const Settings = () => {
   const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        setEmail(user.email);
+    const fetchProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.email) {
+          setEmail(user.email);
+        }
+
+        if (user?.id) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("display_name")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+          if (profile?.display_name) {
+            setDisplayName(profile.display_name);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+      } finally {
+        setLoading(false);
       }
     };
-    getUser();
+
+    fetchProfile();
   }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ display_name: displayName })
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Settings saved",
+        description: "Your profile has been updated.",
+      });
+    } catch (error) {
+      console.error("Error saving profile:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save settings.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -50,6 +111,8 @@ const Settings = () => {
             <Input
               id="displayName"
               placeholder="Enter your display name"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
               className="bg-secondary/50 border-border"
             />
           </div>
@@ -113,7 +176,12 @@ const Settings = () => {
         </div>
       </div>
 
-      <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+      <Button 
+        onClick={handleSave}
+        disabled={saving}
+        className="bg-primary text-primary-foreground hover:bg-primary/90"
+      >
+        {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
         Save Changes
       </Button>
     </div>
