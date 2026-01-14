@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import {
   ComposedChart,
   Line,
@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { EnrichedCandle, ChartIndicator } from "@/hooks/useChartData";
+import type { EnrichedCandle, ChartIndicator } from "@/types/market";
 
 interface OscillatorChartProps {
   data: EnrichedCandle[];
@@ -18,7 +18,7 @@ interface OscillatorChartProps {
   height?: number;
 }
 
-export function RSIChart({ data, height = 100 }: { data: EnrichedCandle[]; height?: number }) {
+function RSIChartComponent({ data, height = 100 }: { data: EnrichedCandle[]; height?: number }) {
   const rsiData = useMemo(() => {
     return data.map(d => ({
       date: d.date,
@@ -64,7 +64,7 @@ export function RSIChart({ data, height = 100 }: { data: EnrichedCandle[]; heigh
           <Line
             type="monotone"
             dataKey="rsi"
-            stroke="hsl(262, 83%, 58%)"
+            stroke="hsl(var(--accent))"
             strokeWidth={1.5}
             dot={false}
             connectNulls
@@ -75,7 +75,7 @@ export function RSIChart({ data, height = 100 }: { data: EnrichedCandle[]; heigh
   );
 }
 
-export function MACDChart({ data, height = 120 }: { data: EnrichedCandle[]; height?: number }) {
+function MACDChartComponent({ data, height = 120 }: { data: EnrichedCandle[]; height?: number }) {
   const macdData = useMemo(() => {
     return data.map(d => ({
       date: d.date,
@@ -145,7 +145,7 @@ export function MACDChart({ data, height = 120 }: { data: EnrichedCandle[]; heig
           <Line
             type="monotone"
             dataKey="macd"
-            stroke="hsl(217, 91%, 60%)"
+            stroke="hsl(var(--info))"
             strokeWidth={1.5}
             dot={false}
             connectNulls
@@ -155,7 +155,7 @@ export function MACDChart({ data, height = 120 }: { data: EnrichedCandle[]; heig
           <Line
             type="monotone"
             dataKey="signal"
-            stroke="hsl(38, 92%, 50%)"
+            stroke="hsl(var(--warning))"
             strokeWidth={1.5}
             dot={false}
             connectNulls
@@ -165,3 +165,6 @@ export function MACDChart({ data, height = 120 }: { data: EnrichedCandle[]; heig
     </div>
   );
 }
+
+export const RSIChart = memo(RSIChartComponent);
+export const MACDChart = memo(MACDChartComponent);

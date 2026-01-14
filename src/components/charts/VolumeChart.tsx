@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -8,14 +8,14 @@ import {
   Tooltip,
   Cell,
 } from "recharts";
-import { EnrichedCandle } from "@/hooks/useChartData";
+import type { EnrichedCandle } from "@/types/market";
 
 interface VolumeChartProps {
   data: EnrichedCandle[];
   height?: number;
 }
 
-export function VolumeChart({ data, height = 60 }: VolumeChartProps) {
+function VolumeChartComponent({ data, height = 60 }: VolumeChartProps) {
   const volumeData = useMemo(() => {
     return data.map(d => ({
       date: d.date,
@@ -66,3 +66,5 @@ export function VolumeChart({ data, height = 60 }: VolumeChartProps) {
     </div>
   );
 }
+
+export const VolumeChart = memo(VolumeChartComponent);

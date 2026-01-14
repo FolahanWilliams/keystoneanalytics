@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { memo, useMemo, useState, useCallback } from "react";
 import {
   ComposedChart,
   Bar,
@@ -11,7 +11,7 @@ import {
   ReferenceLine,
   Area,
 } from "recharts";
-import { EnrichedCandle, ChartIndicator } from "@/hooks/useChartData";
+import type { EnrichedCandle, ChartIndicator } from "@/types/market";
 
 interface PriceChartProps {
   data: EnrichedCandle[];
@@ -21,7 +21,7 @@ interface PriceChartProps {
   height?: number;
 }
 
-export function PriceChart({
+function PriceChartComponent({
   data,
   currentPrice,
   indicators,
@@ -72,8 +72,8 @@ export function PriceChart({
             <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
           </linearGradient>
           <linearGradient id="bbFillGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="hsl(180, 100%, 50%)" stopOpacity={0.08} />
-            <stop offset="100%" stopColor="hsl(180, 100%, 50%)" stopOpacity={0.02} />
+            <stop offset="0%" stopColor="hsl(var(--terminal-cyan))" stopOpacity={0.08} />
+            <stop offset="100%" stopColor="hsl(var(--terminal-cyan))" stopOpacity={0.02} />
           </linearGradient>
         </defs>
         
@@ -181,7 +181,7 @@ export function PriceChart({
             <Line
               type="monotone"
               dataKey="bbUpper"
-              stroke="hsl(180, 100%, 50%)"
+              stroke="hsl(var(--terminal-cyan))"
               strokeWidth={1}
               dot={false}
               opacity={0.6}
@@ -191,7 +191,7 @@ export function PriceChart({
             <Line
               type="monotone"
               dataKey="bbMiddle"
-              stroke="hsl(180, 100%, 50%)"
+              stroke="hsl(var(--terminal-cyan))"
               strokeWidth={1}
               strokeDasharray="4 4"
               dot={false}
@@ -202,7 +202,7 @@ export function PriceChart({
             <Line
               type="monotone"
               dataKey="bbLower"
-              stroke="hsl(180, 100%, 50%)"
+              stroke="hsl(var(--terminal-cyan))"
               strokeWidth={1}
               dot={false}
               opacity={0.6}
@@ -226,7 +226,7 @@ export function PriceChart({
           <Line
             type="monotone"
             dataKey="sma20"
-            stroke="hsl(217, 91%, 60%)"
+            stroke="hsl(var(--info))"
             strokeWidth={1.5}
             dot={false}
             connectNulls
@@ -238,7 +238,7 @@ export function PriceChart({
           <Line
             type="monotone"
             dataKey="sma50"
-            stroke="hsl(38, 92%, 50%)"
+            stroke="hsl(var(--warning))"
             strokeWidth={1.5}
             dot={false}
             connectNulls
@@ -250,7 +250,7 @@ export function PriceChart({
           <Line
             type="monotone"
             dataKey="ema12"
-            stroke="hsl(262, 83%, 58%)"
+            stroke="hsl(var(--accent))"
             strokeWidth={1.5}
             dot={false}
             connectNulls
@@ -262,7 +262,7 @@ export function PriceChart({
           <Line
             type="monotone"
             dataKey="ema26"
-            stroke="hsl(160, 84%, 45%)"
+            stroke="hsl(var(--primary))"
             strokeWidth={1.5}
             dot={false}
             connectNulls
@@ -274,7 +274,7 @@ export function PriceChart({
           <Line
             type="monotone"
             dataKey="vwap"
-            stroke="hsl(45, 93%, 47%)"
+            stroke="hsl(var(--terminal-amber))"
             strokeWidth={1.5}
             strokeDasharray="6 3"
             dot={false}
@@ -327,3 +327,5 @@ export function PriceChart({
     </ResponsiveContainer>
   );
 }
+
+export const PriceChart = memo(PriceChartComponent);
