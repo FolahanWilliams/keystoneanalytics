@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
-import CandlestickChart from "@/components/dashboard/CandlestickChart";
+import AdvancedChart from "@/components/charts/AdvancedChart";
 import WatchlistWidget from "@/components/dashboard/WatchlistWidget";
 import NewsFeed from "@/components/dashboard/NewsFeed";
-import TechnicalIndicators from "@/components/dashboard/TechnicalIndicators";
 import { Activity, Zap, BarChart3 } from "lucide-react";
 import { useQuotes } from "@/hooks/useMarketData";
 
@@ -63,19 +62,10 @@ const Overview = () => {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Main Chart Area */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Chart */}
-          <div className="glass-panel rounded-xl p-6 h-[420px]">
-            <CandlestickChart symbol={selectedSymbol} onSymbolChange={setSelectedSymbol} />
-          </div>
-          
-          {/* Technical Indicators */}
-          <div className="glass-panel rounded-xl p-6">
-            <TechnicalIndicators 
-              symbol={selectedSymbol} 
-              price={quote?.price} 
-              change={quote?.changePercent} 
-            />
+        <div className="lg:col-span-8">
+          {/* Advanced Chart with built-in indicators */}
+          <div className="glass-panel rounded-xl p-6 min-h-[600px]">
+            <AdvancedChart symbol={selectedSymbol} onSymbolChange={setSelectedSymbol} />
           </div>
         </div>
 
