@@ -3,6 +3,7 @@ import AdvancedChart from "@/components/charts/AdvancedChart";
 import { DecisionEngineVerdict } from "@/components/premium/DecisionEngineVerdict";
 import { StockChatWidget } from "@/components/coach/StockChatWidget";
 import { StockSearch } from "@/components/dashboard/StockSearch";
+import { StockResearchPanel } from "@/components/research/StockResearchPanel";
 import { BarChart3 } from "lucide-react";
 import { useQuotes } from "@/hooks/useMarketData";
 
@@ -39,7 +40,7 @@ const Analysis = () => {
           />
         </div>
 
-        {/* Right sidebar - Decision Engine + AI Chat */}
+        {/* Right sidebar - Decision Engine + Research + AI Chat */}
         <div className="xl:col-span-1 space-y-6">
           {/* Decision Engine Verdict */}
           <DecisionEngineVerdict 
@@ -48,6 +49,9 @@ const Analysis = () => {
             change={quote?.change}
             changePercent={quote?.changePercent}
           />
+
+          {/* Web Research Panel */}
+          <StockResearchPanel symbol={selectedSymbol} />
 
           {/* AI Chat Widget */}
           <StockChatWidget 
