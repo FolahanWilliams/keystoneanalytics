@@ -1,9 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Allowed categories for news
+const ALLOWED_CATEGORIES = ["general", "forex", "crypto", "merger"];
+
+function validateCategory(category: unknown): category is string {
+  return typeof category === "string" && ALLOWED_CATEGORIES.includes(category);
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -11,15 +19,54 @@ serve(async (req) => {
   }
 
   try {
-    const { category = "general" } = await req.json();
+    // Authentication check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const body = await req.json();
+    const category = body?.category ?? "general";
+
+    // Validate category
+    if (!validateCategory(category)) {
+      return new Response(
+        JSON.stringify({ error: `Invalid category. Allowed values: ${ALLOWED_CATEGORIES.join(", ")}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const FINNHUB_API_KEY = Deno.env.get("FINHUB_API_KEY");
     
     if (!FINNHUB_API_KEY) {
-      throw new Error("FINHUB_API_KEY is not configured");
+      console.error("FINHUB_API_KEY is not configured");
+      return new Response(
+        JSON.stringify({ error: "Service configuration error" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
+    const encodedCategory = encodeURIComponent(category);
     const response = await fetch(
-      `https://finnhub.io/api/v1/news?category=${category}&token=${FINNHUB_API_KEY}`
+      `https://finnhub.io/api/v1/news?category=${encodedCategory}&token=${FINNHUB_API_KEY}`
     );
     const data = await response.json();
 
@@ -74,7 +121,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Market news error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "An error occurred processing your request" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
