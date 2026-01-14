@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate, Outlet, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, Outlet, useLocation, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Session } from "@supabase/supabase-js";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -11,6 +11,10 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  // Get symbol from URL if present (used when navigating from watchlist)
+  const urlSymbol = searchParams.get("symbol");
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -35,7 +39,10 @@ const Dashboard = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-muted-foreground text-sm">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
@@ -50,7 +57,7 @@ const Dashboard = () => {
       <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
         <MarketOverview />
         <main className="flex-1 overflow-y-auto p-6 scrollbar-terminal">
-          <Outlet />
+          <Outlet context={{ urlSymbol }} />
         </main>
       </div>
     </div>

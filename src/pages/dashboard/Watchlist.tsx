@@ -1,20 +1,27 @@
-import { Star, Search, TrendingUp, TrendingDown, Trash2, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Star, Search, TrendingUp, TrendingDown, Trash2, Loader2, BarChart3, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { AddAssetDialog } from "@/components/dashboard/AddAssetDialog";
+import { useNavigate } from "react-router-dom";
 
 const Watchlist = () => {
   const { watchlist, loading, addToWatchlist, removeFromWatchlist } = useWatchlist();
   const [searchQuery, setSearchQuery] = useState("");
+  const navigate = useNavigate();
 
   const filteredWatchlist = watchlist.filter(
     (item) =>
       item.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleViewChart = (symbol: string) => {
+    // Navigate to overview with symbol selected
+    navigate(`/dashboard?symbol=${symbol}`);
+  };
 
   if (loading) {
     return (
@@ -31,7 +38,7 @@ const Watchlist = () => {
         <div className="flex items-center gap-3">
           <Star className="w-6 h-6 text-primary" />
           <h1 className="text-2xl font-bold">Watchlist</h1>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-muted-foreground px-2 py-0.5 rounded-full bg-secondary">
             {watchlist.length} assets
           </span>
         </div>
@@ -74,8 +81,7 @@ const Watchlist = () => {
                   <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider p-4">24h Change</th>
                   <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider p-4 hidden md:table-cell">24h High</th>
                   <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider p-4 hidden md:table-cell">24h Low</th>
-                  <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider p-4 hidden lg:table-cell">Volume</th>
-                  <th className="text-right text-xs font-medium text-muted-foreground uppercase tracking-wider p-4">Actions</th>
+                  <th className="text-center text-xs font-medium text-muted-foreground uppercase tracking-wider p-4">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -83,14 +89,18 @@ const Watchlist = () => {
                   const isPositive = item.change >= 0;
                   
                   return (
-                    <tr key={item.id} className="hover:bg-secondary/20 transition-colors">
+                    <tr 
+                      key={item.id} 
+                      className="hover:bg-secondary/30 transition-colors cursor-pointer group"
+                      onClick={() => handleViewChart(item.symbol)}
+                    >
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-                            <span className="text-sm font-bold font-mono">{item.symbol.slice(0, 2)}</span>
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                            <span className="text-sm font-bold font-mono text-primary">{item.symbol.slice(0, 2)}</span>
                           </div>
                           <div>
-                            <div className="font-semibold font-mono">{item.symbol}</div>
+                            <div className="font-semibold font-mono group-hover:text-primary transition-colors">{item.symbol}</div>
                             <div className="text-sm text-muted-foreground">{item.name}</div>
                           </div>
                         </div>
@@ -113,26 +123,41 @@ const Watchlist = () => {
                       </td>
                       <td className="p-4 text-right hidden md:table-cell">
                         <span className="font-mono text-sm text-muted-foreground">
-                          ${item.high24h?.toLocaleString()}
+                          ${item.high24h?.toLocaleString() || "—"}
                         </span>
                       </td>
                       <td className="p-4 text-right hidden md:table-cell">
                         <span className="font-mono text-sm text-muted-foreground">
-                          ${item.low24h?.toLocaleString()}
+                          ${item.low24h?.toLocaleString() || "—"}
                         </span>
                       </td>
-                      <td className="p-4 text-right hidden lg:table-cell">
-                        <span className="font-mono text-sm text-muted-foreground">{item.volume}</span>
-                      </td>
-                      <td className="p-4 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeFromWatchlist(item.id)}
-                          className="text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                      <td className="p-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewChart(item.symbol);
+                            }}
+                            className="text-muted-foreground hover:text-primary h-8 w-8 p-0"
+                            title="View chart"
+                          >
+                            <BarChart3 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFromWatchlist(item.id);
+                            }}
+                            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                            title="Remove from watchlist"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -140,6 +165,13 @@ const Watchlist = () => {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* No results */}
+      {watchlist.length > 0 && filteredWatchlist.length === 0 && (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">No assets match your search</p>
         </div>
       )}
     </div>

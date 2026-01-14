@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
-import { Settings as SettingsIcon, User, Bell, Shield, Palette, Loader2 } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Shield, Palette, Loader2, CreditCard, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscription } from "@/hooks/useSubscription";
+import { Link } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 const Settings = () => {
   const [email, setEmail] = useState("");
@@ -13,6 +16,7 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
+  const { tier, isPro } = useSubscription();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -87,6 +91,41 @@ const Settings = () => {
         <h1 className="text-2xl font-bold">Settings</h1>
       </div>
 
+      {/* Subscription Section */}
+      <div className="glass-panel rounded-xl p-6 space-y-6">
+        <div className="flex items-center gap-3 pb-4 border-b border-border">
+          <CreditCard className="w-5 h-5 text-primary" />
+          <h2 className="font-semibold">Subscription</h2>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              "w-10 h-10 rounded-lg flex items-center justify-center",
+              isPro ? "bg-gradient-to-br from-amber-500/20 to-orange-500/20" : "bg-secondary"
+            )}>
+              <Crown className={cn(
+                "w-5 h-5",
+                isPro ? "text-amber-400" : "text-muted-foreground"
+              )} />
+            </div>
+            <div>
+              <p className="font-medium capitalize">{tier} Plan</p>
+              <p className="text-sm text-muted-foreground">
+                {isPro ? "Full access to all features" : "Limited features"}
+              </p>
+            </div>
+          </div>
+          {!isPro && (
+            <Link to="/pricing">
+              <Button className="bg-gradient-to-r from-amber-500 to-orange-500 text-black hover:from-amber-400 hover:to-orange-400">
+                Upgrade
+              </Button>
+            </Link>
+          )}
+        </div>
+      </div>
+
       {/* Profile Section */}
       <div className="glass-panel rounded-xl p-6 space-y-6">
         <div className="flex items-center gap-3 pb-4 border-b border-border">
@@ -128,16 +167,24 @@ const Settings = () => {
 
         <div className="space-y-4">
           {[
-            { id: "price-alerts", label: "Price Alerts", description: "Get notified when assets hit your target price" },
-            { id: "news-alerts", label: "News Alerts", description: "Receive breaking market news notifications" },
-            { id: "portfolio-alerts", label: "Portfolio Updates", description: "Daily summary of your portfolio performance" },
+            { id: "price-alerts", label: "Price Alerts", description: "Get notified when assets hit your target price", requiresPro: true },
+            { id: "news-alerts", label: "News Alerts", description: "Receive breaking market news notifications", requiresPro: true },
+            { id: "portfolio-alerts", label: "Portfolio Updates", description: "Daily summary of your portfolio performance", requiresPro: false },
           ].map((item) => (
             <div key={item.id} className="flex items-center justify-between">
               <div>
-                <Label htmlFor={item.id} className="font-medium">{item.label}</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor={item.id} className="font-medium">{item.label}</Label>
+                  {item.requiresPro && !isPro && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">Pro</span>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">{item.description}</p>
               </div>
-              <Switch id={item.id} />
+              <Switch 
+                id={item.id} 
+                disabled={item.requiresPro && !isPro}
+              />
             </div>
           ))}
         </div>
@@ -151,10 +198,10 @@ const Settings = () => {
         </div>
 
         <div className="space-y-4">
-          <Button variant="outline" className="w-full justify-start">
+          <Button variant="outline" className="w-full justify-start hover:bg-secondary/50 active:bg-secondary/70">
             Change Password
           </Button>
-          <Button variant="outline" className="w-full justify-start">
+          <Button variant="outline" className="w-full justify-start hover:bg-secondary/50 active:bg-secondary/70">
             Enable Two-Factor Authentication
           </Button>
         </div>

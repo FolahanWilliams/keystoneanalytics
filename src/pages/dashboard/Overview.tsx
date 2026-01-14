@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
 import CandlestickChart from "@/components/dashboard/CandlestickChart";
 import WatchlistWidget from "@/components/dashboard/WatchlistWidget";
 import NewsFeed from "@/components/dashboard/NewsFeed";
@@ -6,9 +7,23 @@ import TechnicalIndicators from "@/components/dashboard/TechnicalIndicators";
 import { Activity, Zap, BarChart3 } from "lucide-react";
 import { useQuotes } from "@/hooks/useMarketData";
 
+interface OutletContextType {
+  urlSymbol?: string | null;
+}
+
 const Overview = () => {
+  const context = useOutletContext<OutletContextType>();
+  const urlSymbol = context?.urlSymbol;
+  
   const [selectedSymbol, setSelectedSymbol] = useState("AAPL");
   const { quotes } = useQuotes([selectedSymbol]);
+  
+  // Use URL symbol if provided
+  useEffect(() => {
+    if (urlSymbol) {
+      setSelectedSymbol(urlSymbol);
+    }
+  }, [urlSymbol]);
   
   const quote = quotes[0];
 
@@ -16,7 +31,7 @@ const Overview = () => {
     <div className="space-y-6">
       {/* Quick Stats Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="glass-panel rounded-xl p-4 flex items-center gap-4">
+        <div className="glass-panel rounded-xl p-4 flex items-center gap-4 hover:border-primary/30 transition-colors cursor-pointer">
           <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
             <Activity className="w-6 h-6 text-primary" />
           </div>
@@ -25,7 +40,7 @@ const Overview = () => {
             <p className="text-lg font-semibold">Bullish Trend</p>
           </div>
         </div>
-        <div className="glass-panel rounded-xl p-4 flex items-center gap-4">
+        <div className="glass-panel rounded-xl p-4 flex items-center gap-4 hover:border-primary/30 transition-colors cursor-pointer">
           <div className="w-12 h-12 rounded-xl bg-gain/10 flex items-center justify-center">
             <Zap className="w-6 h-6 text-gain" />
           </div>
@@ -34,7 +49,7 @@ const Overview = () => {
             <p className="text-lg font-semibold font-mono">18.42</p>
           </div>
         </div>
-        <div className="glass-panel rounded-xl p-4 flex items-center gap-4">
+        <div className="glass-panel rounded-xl p-4 flex items-center gap-4 hover:border-primary/30 transition-colors cursor-pointer">
           <div className="w-12 h-12 rounded-xl bg-info/10 flex items-center justify-center">
             <BarChart3 className="w-6 h-6 text-info" />
           </div>
