@@ -27,6 +27,41 @@ function validateType(type: unknown): type is "quotes" | "candles" | "search" {
   return type === "quotes" || type === "candles" || type === "search";
 }
 
+// ======================= In-memory candle cache =======================
+// TTL in milliseconds – keep cached data for 2 minutes to balance freshness vs speed
+const CACHE_TTL_MS = 2 * 60 * 1000;
+
+interface CacheEntry {
+  data: unknown;
+  createdAt: number;
+}
+
+const candleCache = new Map<string, CacheEntry>();
+
+function getCacheKey(symbol: string, resolution: string, days: number): string {
+  return `${symbol.toUpperCase()}::${resolution}::${days}`;
+}
+
+function getFromCache(key: string): unknown | null {
+  const entry = candleCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.createdAt > CACHE_TTL_MS) {
+    candleCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCache(key: string, data: unknown): void {
+  candleCache.set(key, { data, createdAt: Date.now() });
+  // Prevent cache from growing unbounded – evict oldest entries if size > 200
+  if (candleCache.size > 200) {
+    const oldest = candleCache.keys().next().value;
+    if (oldest) candleCache.delete(oldest);
+  }
+}
+// ======================================================================
+
 // ---- Candle aggregation helpers (makes unsupported provider resolutions still work) ----
 
 type RawCandle = {
@@ -140,10 +175,9 @@ serve(async (req) => {
 
   try {
     // Authentication is optional for market data - allow public access for viewing
-    // This enables charts to work on landing pages and for non-logged-in users
     const authHeader = req.headers.get("Authorization");
     let isAuthenticated = false;
-    
+
     if (authHeader?.startsWith("Bearer ")) {
       const supabaseClient = createClient(
         Deno.env.get("SUPABASE_URL") ?? "",
@@ -155,12 +189,11 @@ serve(async (req) => {
       const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
       isAuthenticated = !claimsError && !!claimsData?.claims;
     }
-    
-    // Log access for monitoring (authenticated vs anonymous)
+
     console.log(`Market data request - authenticated: ${isAuthenticated}`);
 
     const { symbols, type, resolution, days } = await req.json();
-    
+
     // Validate request type
     if (!validateType(type)) {
       return new Response(
@@ -178,7 +211,7 @@ serve(async (req) => {
     }
 
     const FINNHUB_API_KEY = Deno.env.get("FINHUB_API_KEY");
-    
+
     if (!FINNHUB_API_KEY) {
       console.error("FINHUB_API_KEY is not configured");
       return new Response(
@@ -197,7 +230,7 @@ serve(async (req) => {
               `https://finnhub.io/api/v1/quote?symbol=${encodedSymbol}&token=${FINNHUB_API_KEY}`
             );
             const data = await response.json();
-            
+
             return {
               symbol,
               price: data.c || 0,
@@ -225,22 +258,33 @@ serve(async (req) => {
     if (type === "candles") {
       const symbol = symbols[0];
       const encodedSymbol = encodeURIComponent(symbol.toUpperCase());
-      
+
       // Use resolution and days from request, with defaults
       const candleResolution = resolution || "D";
       const candleDays = days || 30;
-      
+
+      // ---- Check cache first ----
+      const cacheKey = getCacheKey(symbol, candleResolution, candleDays);
+      const cached = getFromCache(cacheKey);
+      if (cached) {
+        console.log(`[CACHE HIT] ${cacheKey}`);
+        return new Response(JSON.stringify(cached), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      console.log(`[CACHE MISS] ${cacheKey}`);
+
       // Calculate time range
       const to = Math.floor(Date.now() / 1000);
       const from = to - candleDays * 24 * 60 * 60;
-      
+
       console.log(`Fetching ${symbol} candles: resolution=${candleResolution}, days=${candleDays}`);
 
       const finnhubResponse = await fetch(
         `https://finnhub.io/api/v1/stock/candle?symbol=${encodedSymbol}&resolution=${candleResolution}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`
       );
       const finnhubData = await finnhubResponse.json();
-      
+
       console.log(`Finnhub candle response for ${symbol}:`, finnhubData.s);
 
       // If Finnhub has data, use it
@@ -270,7 +314,10 @@ serve(async (req) => {
           volume: c.volume,
         }));
 
-        return new Response(JSON.stringify({ candles, resolution: candleResolution }), {
+        const payload = { candles, resolution: candleResolution };
+        setCache(cacheKey, payload);
+
+        return new Response(JSON.stringify(payload), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -300,10 +347,12 @@ serve(async (req) => {
             volume: c.volume,
           }));
 
-          return new Response(
-            JSON.stringify({ candles, resolution: candleResolution, aggregatedFrom: baseResolution }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          const payload = { candles, resolution: candleResolution, aggregatedFrom: baseResolution };
+          setCache(cacheKey, payload);
+
+          return new Response(JSON.stringify(payload), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
       }
 
@@ -316,11 +365,11 @@ serve(async (req) => {
             `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodedSymbol}&outputsize=compact&apikey=${ALPHA_VANTAGE_KEY}`
           );
           const avData = await avResponse.json();
-          
+
           if (avData["Time Series (Daily)"]) {
             const timeSeries = avData["Time Series (Daily)"];
             const dates = Object.keys(timeSeries).sort().slice(-30); // Last 30 days
-            
+
             const candles = dates.map((dateStr) => {
               const d = timeSeries[dateStr];
               return {
@@ -335,7 +384,10 @@ serve(async (req) => {
             });
 
             console.log(`Alpha Vantage returned ${candles.length} candles for ${symbol}`);
-            return new Response(JSON.stringify({ candles }), {
+            const payload = { candles };
+            setCache(cacheKey, payload);
+
+            return new Response(JSON.stringify(payload), {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           } else if (avData.Note) {
@@ -355,17 +407,17 @@ serve(async (req) => {
           `https://finnhub.io/api/v1/quote?symbol=${encodedSymbol}&token=${FINNHUB_API_KEY}`
         );
         const quote = await quoteResponse.json();
-        
+
         if (quote.c && quote.c > 0) {
           const currentPrice = quote.c;
           const candles = [];
-          
+
           // Determine number of candles and time step based on resolution
           let numCandles: number;
           let timeStepMs: number;
           let volatility: number;
           let dateFormatOptions: Intl.DateTimeFormatOptions;
-          
+
           switch (candleResolution) {
             case "1":
               numCandles = Math.min(60, candleDays * 60 * 24);
@@ -421,26 +473,28 @@ serve(async (req) => {
               volatility = 0.02;
               dateFormatOptions = { month: "short", day: "numeric" };
           }
-          
+
           let price = currentPrice * (1 - volatility * numCandles * 0.3);
           const now = Date.now();
-          
+
           for (let i = numCandles - 1; i >= 0; i--) {
             const timestamp = now - i * timeStepMs;
             const date = new Date(timestamp);
-            
+
             // Skip weekends for daily and higher resolutions
-            if ((candleResolution === "D" || candleResolution === "W") && 
-                (date.getDay() === 0 || date.getDay() === 6)) {
+            if (
+              (candleResolution === "D" || candleResolution === "W") &&
+              (date.getDay() === 0 || date.getDay() === 6)
+            ) {
               continue;
             }
-            
+
             const change = (Math.random() - 0.45) * volatility * price;
             const open = price;
             const close = price + change;
             const high = Math.max(open, close) * (1 + Math.random() * volatility * 0.5);
             const low = Math.min(open, close) * (1 - Math.random() * volatility * 0.5);
-            
+
             candles.push({
               date: date.toLocaleDateString("en-US", dateFormatOptions),
               timestamp: Math.floor(timestamp / 1000),
@@ -450,10 +504,10 @@ serve(async (req) => {
               close: parseFloat(close.toFixed(2)),
               volume: Math.floor(Math.random() * 10000000) + 1000000,
             });
-            
+
             price = close;
           }
-          
+
           // Adjust last candle to match current price
           if (candles.length > 0) {
             candles[candles.length - 1].close = currentPrice;
@@ -462,7 +516,10 @@ serve(async (req) => {
           }
 
           console.log(`Generated ${candles.length} synthetic candles for ${symbol}`);
-          return new Response(JSON.stringify({ candles, synthetic: true, resolution: candleResolution }), {
+          const payload = { candles, synthetic: true, resolution: candleResolution };
+          setCache(cacheKey, payload);
+
+          return new Response(JSON.stringify(payload), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
