@@ -92,66 +92,66 @@ export function DecisionEngineVerdict({
     <>
       <div className="glass-panel rounded-xl overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-border/50 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-primary" />
+        <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <BarChart3 className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <h3 className="font-bold text-lg flex items-center gap-2">
-                Decision Engine Verdict
-                <span className="premium-badge text-[10px]">
-                  <Sparkles className="w-3 h-3" />
-                  AI Powered
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                Decision Engine
+                <span className="premium-badge text-[9px] px-1.5 py-0.5">
+                  <Sparkles className="w-2.5 h-2.5" />
+                  AI
                 </span>
               </h3>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] text-muted-foreground">
                 47-factor analysis for {symbol}
               </p>
             </div>
           </div>
           
           {hasPremiumAccess && (
-            <div className="text-xs text-muted-foreground">
-              Last updated: Just now
+            <div className="text-[10px] text-muted-foreground">
+              Just now
             </div>
           )}
         </div>
 
-        <div className="p-6">
+        <div className="p-4">
           {/* Signal Display - Always visible */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
               <div className={cn(
-                "w-16 h-16 rounded-xl flex items-center justify-center",
+                "w-12 h-12 rounded-lg flex items-center justify-center",
                 signalBg
               )}>
-                <SignalIcon className={cn("w-8 h-8", signalColor)} />
+                <SignalIcon className={cn("w-6 h-6", signalColor)} />
               </div>
               <div>
-                <div className="text-sm text-muted-foreground mb-1">Technical Signal</div>
-                <div className={cn("text-2xl font-bold", signalColor)}>
+                <div className="text-xs text-muted-foreground">Technical Signal</div>
+                <div className={cn("text-lg font-bold", signalColor)}>
                   {analysis.signal}
                 </div>
               </div>
             </div>
             
             <div className="text-right">
-              <div className="text-sm text-muted-foreground mb-1">Signal Strength</div>
-              <div className="text-3xl font-bold font-mono">
+              <div className="text-xs text-muted-foreground">Strength</div>
+              <div className="text-2xl font-bold font-mono">
                 {analysis.signalScore.toFixed(0)}
-                <span className="text-base text-muted-foreground">/100</span>
+                <span className="text-sm text-muted-foreground">/100</span>
               </div>
             </div>
           </div>
 
           {/* Catalysts - Always visible */}
-          <div className="mb-6">
-            <div className="text-sm font-medium mb-2 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-warning" />
+          <div className="mb-4">
+            <div className="text-xs font-medium mb-1 flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-warning" />
               Key Catalysts Detected
             </div>
-            <div className="text-sm text-muted-foreground">
+            <div className="text-xs text-muted-foreground">
               Our engine has identified <span className="text-primary font-semibold">3 key catalysts</span> for this ticker.
             </div>
           </div>
@@ -160,33 +160,33 @@ export function DecisionEngineVerdict({
           <div className="relative">
             {/* Blurred content */}
             <div className={cn(
-              "space-y-6 transition-all duration-300",
+              "space-y-3 transition-all duration-300",
               !hasPremiumAccess && "blur-md select-none pointer-events-none"
             )}>
               {/* Rationale Section */}
-              <div className="rounded-lg bg-secondary/30 p-4">
-                <div className="text-sm font-medium mb-2 flex items-center gap-2">
-                  <Eye className="w-4 h-4 text-info" />
+              <div className="rounded-lg bg-secondary/30 p-3">
+                <div className="text-xs font-medium mb-1.5 flex items-center gap-1.5">
+                  <Eye className="w-3.5 h-3.5 text-info" />
                   Analysis Rationale
                 </div>
-                <p className="text-sm text-muted-foreground leading-relaxed">
+                <p className="text-xs text-muted-foreground leading-relaxed">
                   {analysis.rationale}
                 </p>
               </div>
 
               {/* Action Plan Section */}
-              <div className="rounded-lg bg-secondary/30 p-4">
-                <div className="text-sm font-medium mb-3 flex items-center gap-2">
-                  <Target className="w-4 h-4 text-primary" />
-                  Professional Action Plan
+              <div className="rounded-lg bg-secondary/30 p-3">
+                <div className="text-xs font-medium mb-2 flex items-center gap-1.5">
+                  <Target className="w-3.5 h-3.5 text-primary" />
+                  Action Plan
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {analysis.actionPlan.map((action, i) => (
                     <div 
                       key={i} 
-                      className="flex items-center gap-2 text-sm font-mono"
+                      className="flex items-center gap-1.5 text-xs font-mono"
                     >
-                      <ChevronRight className="w-3 h-3 text-primary shrink-0" />
+                      <ChevronRight className="w-2.5 h-2.5 text-primary shrink-0" />
                       <span>{action}</span>
                     </div>
                   ))}
@@ -194,20 +194,20 @@ export function DecisionEngineVerdict({
               </div>
 
               {/* Risk Assessment */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-lg bg-secondary/30 p-4">
-                  <div className="text-xs text-muted-foreground mb-1">Risk Level</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-secondary/30 p-2.5">
+                  <div className="text-[10px] text-muted-foreground mb-0.5">Risk Level</div>
                   <div className={cn(
-                    "font-semibold flex items-center gap-2",
+                    "text-sm font-semibold flex items-center gap-1.5",
                     analysis.riskLevel === "Moderate" ? "text-warning" : "text-loss"
                   )}>
-                    <AlertTriangle className="w-4 h-4" />
+                    <AlertTriangle className="w-3.5 h-3.5" />
                     {analysis.riskLevel}
                   </div>
                 </div>
-                <div className="rounded-lg bg-secondary/30 p-4">
-                  <div className="text-xs text-muted-foreground mb-1">Time Horizon</div>
-                  <div className="font-semibold">{analysis.timeHorizon}</div>
+                <div className="rounded-lg bg-secondary/30 p-2.5">
+                  <div className="text-[10px] text-muted-foreground mb-0.5">Time Horizon</div>
+                  <div className="text-sm font-semibold">{analysis.timeHorizon}</div>
                 </div>
               </div>
             </div>
