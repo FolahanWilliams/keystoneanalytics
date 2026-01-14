@@ -202,6 +202,56 @@ async function fetchMarketData(symbol: string): Promise<MarketData> {
   return result;
 }
 
+// Fetch economic indicators from FRED
+async function fetchEconomicData(): Promise<any> {
+  const FRED_API_KEY = Deno.env.get("FRED_API_KEY");
+  if (!FRED_API_KEY) return null;
+
+  const indicators = ['FEDFUNDS', 'DGS10', 'T10Y2Y', 'VIXCLS', 'UNRATE'];
+  
+  try {
+    const results = await Promise.all(
+      indicators.map(async (seriesId) => {
+        const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=1`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.observations && data.observations[0]) {
+          return { id: seriesId, value: parseFloat(data.observations[0].value), date: data.observations[0].date };
+        }
+        return null;
+      })
+    );
+    return results.filter(Boolean);
+  } catch (e) {
+    console.error("Error fetching FRED data:", e);
+    return null;
+  }
+}
+
+// Fetch relevant news for a stock
+async function fetchStockNews(symbol: string): Promise<any[]> {
+  const NEWSAPI_KEY = Deno.env.get("NEWSAPI_KEY");
+  if (!NEWSAPI_KEY) return [];
+
+  try {
+    const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(symbol)}&sortBy=publishedAt&pageSize=5&language=en&apiKey=${NEWSAPI_KEY}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    
+    if (data.status === 'ok' && data.articles) {
+      return data.articles.slice(0, 5).map((a: any) => ({
+        title: a.title,
+        source: a.source?.name,
+        publishedAt: a.publishedAt,
+        description: a.description?.substring(0, 150),
+      }));
+    }
+  } catch (e) {
+    console.error("Error fetching news:", e);
+  }
+  return [];
+}
+
 // Extract stock symbols from message
 function extractSymbols(message: string): string[] {
   // Common patterns: $AAPL, AAPL, "Apple stock"
@@ -218,11 +268,39 @@ function extractSymbols(message: string): string[] {
 }
 
 // Build the system prompt with market context
-function buildSystemPrompt(marketData: MarketData[]): string {
+function buildSystemPrompt(marketData: MarketData[], economicData: any, newsData: Record<string, any[]>): string {
   let marketContext = "";
   
+  // Economic data section
+  if (economicData && economicData.length > 0) {
+    marketContext += "\n\n## MACRO ECONOMIC ENVIRONMENT (FRED Data)\n";
+    const indicatorNames: Record<string, string> = {
+      'FEDFUNDS': 'Fed Funds Rate',
+      'DGS10': '10-Year Treasury Yield',
+      'T10Y2Y': '10Y-2Y Spread (Yield Curve)',
+      'VIXCLS': 'VIX (Fear Index)',
+      'UNRATE': 'Unemployment Rate'
+    };
+    
+    for (const indicator of economicData) {
+      const name = indicatorNames[indicator.id] || indicator.id;
+      let context = '';
+      if (indicator.id === 'T10Y2Y' && indicator.value < 0) {
+        context = ' ⚠️ INVERTED - Recession Warning Signal';
+      } else if (indicator.id === 'VIXCLS') {
+        if (indicator.value > 25) context = ' ⚠️ High Fear';
+        else if (indicator.value < 15) context = ' ✅ Low Volatility/Complacency';
+      } else if (indicator.id === 'FEDFUNDS') {
+        if (indicator.value > 5) context = ' (Restrictive Policy)';
+        else if (indicator.value < 2) context = ' (Accommodative Policy)';
+      }
+      marketContext += `- **${name}:** ${indicator.value.toFixed(2)}%${context}\n`;
+    }
+    marketContext += "\nUse this economic context to inform your analysis of market conditions and sector impacts.\n";
+  }
+  
   if (marketData.length > 0) {
-    marketContext = "\n\n## CURRENT MARKET DATA (Real-time)\n";
+    marketContext += "\n\n## CURRENT MARKET DATA (Real-time)\n";
     
     for (const data of marketData) {
       marketContext += `\n### ${data.symbol}\n`;
@@ -246,6 +324,14 @@ function buildSystemPrompt(marketData: MarketData[]): string {
         marketContext += `- **Support Level:** $${t.support} | **Resistance Level:** $${t.resistance}\n`;
       }
       
+      // Add news for this symbol
+      if (newsData[data.symbol] && newsData[data.symbol].length > 0) {
+        marketContext += `\n**Recent News:**\n`;
+        for (const article of newsData[data.symbol]) {
+          marketContext += `- ${article.title} (${article.source}, ${new Date(article.publishedAt).toLocaleDateString()})\n`;
+        }
+      }
+      
       if (data.candles && data.candles.length > 0) {
         const recentCandles = data.candles.slice(-5);
         marketContext += `\n**Recent Price Action (Last 5 Days):**\n`;
@@ -257,22 +343,25 @@ function buildSystemPrompt(marketData: MarketData[]): string {
     }
   }
 
-  return `You are an expert AI Stock Coach and Trading Mentor. Your role is to help users make informed, educated trading decisions based on real market data and proven trading principles.
+  return `You are an expert AI Stock Coach and Trading Mentor. Your role is to help users make informed, educated trading decisions based on real market data, macroeconomic indicators, and proven trading principles.
 
 ## Your Expertise
 - Technical Analysis: Chart patterns, indicators (RSI, MACD, Bollinger Bands, Moving Averages, ATR)
 - Fundamental Analysis: Understanding company valuations, earnings, and market position
+- Macroeconomic Analysis: Fed policy, interest rates, yield curves, economic cycles
 - Risk Management: Position sizing, stop-losses, risk-reward ratios
 - Trading Psychology: Emotional discipline, avoiding common pitfalls
 - Market Dynamics: Understanding trends, volatility, and market cycles
 
 ## Your Teaching Approach
-1. **Analyze the Data First**: When discussing a stock, always reference the actual market data provided
-2. **Explain Your Reasoning**: Don't just give answers—teach the user WHY you're reaching these conclusions
-3. **Consider Multiple Perspectives**: Present bullish and bearish cases when relevant
-4. **Emphasize Risk Management**: Always discuss potential risks and how to manage them
-5. **Be Educational**: Use every question as an opportunity to teach trading concepts
-6. **Be Specific**: Use actual numbers from the data—price levels, percentages, indicator values
+1. **Analyze the Data First**: When discussing a stock, always reference the actual market data provided including macro environment
+2. **Consider the Macro Context**: Reference economic indicators like Fed rates, yield curve, and VIX to provide holistic analysis
+3. **Incorporate News Sentiment**: Use recent news to identify potential catalysts or risks
+4. **Explain Your Reasoning**: Don't just give answers—teach the user WHY you're reaching these conclusions
+5. **Consider Multiple Perspectives**: Present bullish and bearish cases when relevant
+6. **Emphasize Risk Management**: Always discuss potential risks and how to manage them
+7. **Be Educational**: Use every question as an opportunity to teach trading concepts
+8. **Be Specific**: Use actual numbers from the data—price levels, percentages, indicator values
 
 ## Risk Disclaimer
 Always remind users that:
@@ -285,6 +374,8 @@ ${marketContext}
 
 ## Response Guidelines
 - Use the real market data above to provide specific, actionable insights
+- Reference macroeconomic conditions when they're relevant to the stock or market question
+- Mention any significant news that could impact the stock
 - Format responses with clear sections and bullet points
 - Include specific price levels for entries, stops, and targets when relevant
 - Explain technical indicators in plain English
@@ -317,14 +408,27 @@ serve(async (req) => {
 
     console.log(`Stock Coach: Processing request for symbols: ${symbols.join(', ') || 'none'}`);
 
-    // Fetch market data for all symbols
-    const marketDataPromises = symbols.slice(0, 5).map(fetchMarketData); // Limit to 5 symbols
-    const marketData = await Promise.all(marketDataPromises);
+    // Fetch all data in parallel
+    const [marketData, economicData, ...newsResults] = await Promise.all([
+      Promise.all(symbols.slice(0, 5).map(fetchMarketData)),
+      fetchEconomicData(),
+      ...symbols.slice(0, 3).map(fetchStockNews)
+    ]);
     
-    console.log(`Stock Coach: Fetched data for ${marketData.length} symbols`);
+    // Build news data map
+    const newsData: Record<string, any[]> = {};
+    symbols.slice(0, 3).forEach((sym: string, idx: number) => {
+      newsData[sym] = newsResults[idx] || [];
+    });
+    
+    console.log(`Stock Coach: Fetched data for ${marketData.length} symbols, ${economicData?.length || 0} economic indicators`);
 
     // Build system prompt with market context
-    const systemPrompt = buildSystemPrompt(marketData.filter(d => d.quote || d.candles));
+    const systemPrompt = buildSystemPrompt(
+      marketData.filter(d => d.quote || d.candles), 
+      economicData,
+      newsData
+    );
 
     // Call Lovable AI Gateway with streaming
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
