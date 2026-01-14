@@ -1,6 +1,7 @@
 import { useState } from "react";
 import AdvancedChart from "@/components/charts/AdvancedChart";
 import { DecisionEngineVerdict } from "@/components/premium/DecisionEngineVerdict";
+import { StockChatWidget } from "@/components/coach/StockChatWidget";
 import { BarChart3 } from "lucide-react";
 import { useQuotes } from "@/hooks/useMarketData";
 
@@ -25,12 +26,20 @@ const Analysis = () => {
           />
         </div>
 
-        {/* Decision Engine Verdict - takes 1 column */}
-        <div className="xl:col-span-1">
+        {/* Right sidebar - Decision Engine + AI Chat */}
+        <div className="xl:col-span-1 space-y-6">
+          {/* Decision Engine Verdict */}
           <DecisionEngineVerdict 
             symbol={selectedSymbol}
             price={quote?.price}
             change={quote?.change}
+            changePercent={quote?.changePercent}
+          />
+
+          {/* AI Chat Widget */}
+          <StockChatWidget 
+            symbol={selectedSymbol}
+            price={quote?.price}
             changePercent={quote?.changePercent}
           />
         </div>
