@@ -86,20 +86,6 @@ const Landing = () => {
           </Link>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-8 mt-20 md:grid-cols-4 animate-fade-in delay-300">
-          {[
-            { label: "Active Traders", value: "50K+" },
-            { label: "Daily Volume", value: "$2.4B" },
-            { label: "Markets", value: "100+" },
-            { label: "Uptime", value: "99.9%" },
-          ].map((stat) => (
-            <div key={stat.label} className="text-center">
-              <div className="text-3xl font-bold text-primary font-mono">{stat.value}</div>
-              <div className="mt-1 text-sm text-muted-foreground">{stat.label}</div>
-            </div>
-          ))}
-        </div>
       </main>
 
       {/* Features Section */}
