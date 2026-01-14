@@ -11,7 +11,7 @@ import {
   ReferenceLine,
   Area,
 } from "recharts";
-import { useCandles, useQuotes } from "@/hooks/useMarketData";
+import { useCandles, useQuotes, TimeframeType } from "@/hooks/useMarketData";
 import { Loader2, TrendingUp, TrendingDown, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -22,12 +22,12 @@ interface CandlestickChartProps {
   onSymbolChange?: (symbol: string) => void;
 }
 
-const timeframes = ["1H", "4H", "1D", "1W", "1M"];
+const timeframes: TimeframeType[] = ["1H", "4H", "1D", "1W", "1M"];
 
 const CandlestickChart = ({ symbol = "AAPL", onSymbolChange }: CandlestickChartProps) => {
-  const [selectedTf, setSelectedTf] = useState("1D");
+  const [selectedTf, setSelectedTf] = useState<TimeframeType>("1D");
   const [showSearch, setShowSearch] = useState(false);
-  const { candles, loading, error, refetch } = useCandles(symbol);
+  const { candles, loading, error, refetch } = useCandles(symbol, selectedTf);
   const { quotes } = useQuotes([symbol]);
   
   const quote = quotes[0];

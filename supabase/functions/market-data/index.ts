@@ -27,6 +27,33 @@ function validateType(type: unknown): type is "quotes" | "candles" | "search" {
   return type === "quotes" || type === "candles" || type === "search";
 }
 
+// Get appropriate date format based on resolution
+function getDateFormat(resolution: string): Intl.DateTimeFormatOptions {
+  switch (resolution) {
+    case "1":
+    case "5":
+    case "15":
+    case "30":
+    case "60":
+      return { hour: "2-digit", minute: "2-digit" };
+    case "240":
+      return { month: "short", day: "numeric", hour: "2-digit" };
+    case "D":
+      return { month: "short", day: "numeric" };
+    case "W":
+      return { month: "short", day: "numeric" };
+    case "M":
+      return { month: "short", year: "2-digit" };
+    default:
+      return { month: "short", day: "numeric" };
+  }
+}
+
+// Format date with given options
+function formatDate(timestamp: number, options: Intl.DateTimeFormatOptions): string {
+  return new Date(timestamp).toLocaleDateString("en-US", options);
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -53,7 +80,7 @@ serve(async (req) => {
     // Log access for monitoring (authenticated vs anonymous)
     console.log(`Market data request - authenticated: ${isAuthenticated}`);
 
-    const { symbols, type } = await req.json();
+    const { symbols, type, resolution, days } = await req.json();
     
     // Validate request type
     if (!validateType(type)) {
@@ -120,13 +147,18 @@ serve(async (req) => {
       const symbol = symbols[0];
       const encodedSymbol = encodeURIComponent(symbol.toUpperCase());
       
-      // Try Finnhub first
-      const resolution = "D"; // Daily
+      // Use resolution and days from request, with defaults
+      const candleResolution = resolution || "D";
+      const candleDays = days || 30;
+      
+      // Calculate time range
       const to = Math.floor(Date.now() / 1000);
-      const from = to - 30 * 24 * 60 * 60; // 30 days
+      const from = to - candleDays * 24 * 60 * 60;
+      
+      console.log(`Fetching ${symbol} candles: resolution=${candleResolution}, days=${candleDays}`);
 
       const finnhubResponse = await fetch(
-        `https://finnhub.io/api/v1/stock/candle?symbol=${encodedSymbol}&resolution=${resolution}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`
+        `https://finnhub.io/api/v1/stock/candle?symbol=${encodedSymbol}&resolution=${candleResolution}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`
       );
       const finnhubData = await finnhubResponse.json();
       
@@ -134,8 +166,9 @@ serve(async (req) => {
 
       // If Finnhub has data, use it
       if (finnhubData.s === "ok" && finnhubData.t?.length > 0) {
+        const dateFormat = getDateFormat(candleResolution);
         const candles = finnhubData.t.map((timestamp: number, i: number) => ({
-          date: new Date(timestamp * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+          date: formatDate(timestamp * 1000, dateFormat),
           timestamp,
           open: finnhubData.o[i],
           high: finnhubData.h[i],
@@ -144,7 +177,7 @@ serve(async (req) => {
           volume: finnhubData.v[i],
         }));
 
-        return new Response(JSON.stringify({ candles }), {
+        return new Response(JSON.stringify({ candles, resolution: candleResolution }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
