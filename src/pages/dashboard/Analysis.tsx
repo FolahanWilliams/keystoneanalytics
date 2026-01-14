@@ -17,13 +17,13 @@ const Analysis = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <BarChart3 className="w-6 h-6 text-primary" />
-          <h1 className="text-2xl font-bold">Technical Analysis</h1>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="w-5 h-5 text-primary" />
+          <h1 className="text-xl font-bold">Technical Analysis</h1>
         </div>
-        <div className="w-full sm:w-72">
+        <div className="w-full sm:w-64">
           <StockSearch 
             onSelect={handleSymbolSelect}
             placeholder="Search stocks..."
@@ -31,17 +31,17 @@ const Analysis = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Main Chart - takes 2 columns */}
-        <div className="xl:col-span-2 glass-panel rounded-xl p-6 min-h-[600px]">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        {/* Main Chart - takes 8 columns */}
+        <div className="xl:col-span-8 glass-panel rounded-xl p-4 min-h-[580px]">
           <AdvancedChart 
             symbol={selectedSymbol} 
             onSymbolChange={setSelectedSymbol} 
           />
         </div>
 
-        {/* Right sidebar - Decision Engine + Research + AI Chat */}
-        <div className="xl:col-span-1 space-y-6">
+        {/* Right sidebar - Research + AI Chat stacked compactly */}
+        <div className="xl:col-span-4 flex flex-col gap-4">
           {/* Decision Engine Verdict */}
           <DecisionEngineVerdict 
             symbol={selectedSymbol}
@@ -50,15 +50,15 @@ const Analysis = () => {
             changePercent={quote?.changePercent}
           />
 
-          {/* Web Research Panel */}
-          <StockResearchPanel symbol={selectedSymbol} />
-
-          {/* AI Chat Widget */}
-          <StockChatWidget 
-            symbol={selectedSymbol}
-            price={quote?.price}
-            changePercent={quote?.changePercent}
-          />
+          {/* Web Research Panel + AI Chat in a compact layout */}
+          <div className="grid grid-cols-1 gap-4">
+            <StockResearchPanel symbol={selectedSymbol} />
+            <StockChatWidget 
+              symbol={selectedSymbol}
+              price={quote?.price}
+              changePercent={quote?.changePercent}
+            />
+          </div>
         </div>
       </div>
     </div>

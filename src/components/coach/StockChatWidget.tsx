@@ -113,49 +113,49 @@ export function StockChatWidget({ symbol, price, changePercent }: StockChatWidge
   return (
     <div className={cn(
       "glass-panel rounded-xl overflow-hidden flex flex-col transition-all duration-300",
-      isExpanded ? "h-[500px]" : "h-[280px]"
+      isExpanded ? "h-[400px]" : "h-[220px]"
     )}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border/50 bg-gradient-to-r from-primary/5 to-transparent">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-            <Sparkles className="w-3.5 h-3.5 text-primary-foreground" />
+          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
+            <Sparkles className="w-3 h-3 text-primary-foreground" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold">AI Coach</h3>
-            <p className="text-[10px] text-muted-foreground">Ask about {symbol}</p>
+            <h3 className="text-xs font-semibold">AI Coach</h3>
+            <p className="text-[9px] text-muted-foreground">Ask about {symbol}</p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="h-6 w-6"
+            className="h-5 w-5"
           >
-            {isExpanded ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
+            {isExpanded ? <Minimize2 className="w-2.5 h-2.5" /> : <Maximize2 className="w-2.5 h-2.5" />}
           </Button>
           {messages.length > 0 && (
             <Button
               variant="ghost"
               size="icon"
               onClick={clearMessages}
-              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              className="h-5 w-5 text-muted-foreground hover:text-foreground"
             >
-              <X className="w-3 h-3" />
+              <X className="w-2.5 h-2.5" />
             </Button>
           )}
         </div>
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-3" ref={scrollRef}>
+      <ScrollArea className="flex-1 p-2" ref={scrollRef}>
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center py-4">
-            <p className="text-xs text-muted-foreground mb-3">
+          <div className="h-full flex flex-col items-center justify-center text-center py-2">
+            <p className="text-[10px] text-muted-foreground mb-2">
               Ask anything about {symbol}
             </p>
-            <div className="flex flex-wrap gap-1.5 justify-center">
+            <div className="flex flex-wrap gap-1 justify-center">
               {quickPrompts.map((prompt) => (
                 <button
                   key={prompt}
@@ -163,7 +163,7 @@ export function StockChatWidget({ symbol, price, changePercent }: StockChatWidge
                     sendMessage(`${prompt} for ${symbol}`, [symbol]);
                   }}
                   disabled={isLoading}
-                  className="px-2.5 py-1 rounded-full bg-secondary/50 hover:bg-secondary border border-border/50 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                  className="px-2 py-0.5 rounded-full bg-secondary/50 hover:bg-secondary border border-border/50 text-[9px] text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {prompt}
                 </button>
@@ -180,27 +180,27 @@ export function StockChatWidget({ symbol, price, changePercent }: StockChatWidge
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-2 border-t border-border/50 bg-background/50">
-        <form onSubmit={handleSubmit} className="flex gap-1.5">
+      <div className="p-1.5 border-t border-border/50 bg-background/50">
+        <form onSubmit={handleSubmit} className="flex gap-1">
           <Textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={`Ask about ${symbol}...`}
-            className="min-h-[32px] max-h-[60px] resize-none text-xs py-1.5 px-2.5 bg-secondary/30 border-border/50"
+            className="min-h-[28px] max-h-[50px] resize-none text-[10px] py-1 px-2 bg-secondary/30 border-border/50"
             disabled={isLoading}
           />
           <Button
             type="submit"
             size="icon"
             disabled={!input.trim() || isLoading}
-            className="h-8 w-8 shrink-0"
+            className="h-7 w-7 shrink-0"
           >
             {isLoading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <Loader2 className="w-3 h-3 animate-spin" />
             ) : (
-              <Send className="w-3.5 h-3.5" />
+              <Send className="w-3 h-3" />
             )}
           </Button>
         </form>
