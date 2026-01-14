@@ -101,11 +101,16 @@ export function useCandles(symbol: string, timeframe: TimeframeType = "1D") {
   const [error, setError] = useState<string | null>(null);
 
   const requestSeq = useRef(0);
+  const hasRenderedDataRef = useRef(false);
+  const lastKeyRef = useRef<string | null>(null);
 
   const fetchCandles = useCallback(async () => {
     if (!symbol) {
       setCandles([]);
       setLoading(false);
+      setError(null);
+      hasRenderedDataRef.current = false;
+      lastKeyRef.current = null;
       return;
     }
 
@@ -114,10 +119,20 @@ export function useCandles(symbol: string, timeframe: TimeframeType = "1D") {
     const key = cacheKey(symbol, timeframe);
 
     const cached = candleCache.get(key);
-    const cacheFresh = cached && Date.now() - cached.ts < CANDLE_CACHE_TTL_MS;
-    if (cacheFresh) setCandles(cached.candles);
+    const cacheFresh = !!cached && Date.now() - cached.ts < CANDLE_CACHE_TTL_MS;
 
-    setLoading(!cacheFresh && candles.length === 0);
+    if (lastKeyRef.current !== key && !cacheFresh) {
+      setCandles([]);
+      hasRenderedDataRef.current = false;
+    }
+    lastKeyRef.current = key;
+
+    if (cacheFresh) {
+      setCandles(cached.candles);
+      hasRenderedDataRef.current = cached.candles.length > 0;
+    }
+
+    setLoading(!cacheFresh && !hasRenderedDataRef.current);
     setError(null);
 
     try {
@@ -137,6 +152,7 @@ export function useCandles(symbol: string, timeframe: TimeframeType = "1D") {
 
       const nextCandles: Candle[] = data?.candles || [];
       setCandles(nextCandles);
+      hasRenderedDataRef.current = nextCandles.length > 0;
       candleCache.set(key, { candles: nextCandles, ts: Date.now() });
     } catch (err) {
       if (requestSeq.current !== mySeq) return;
@@ -145,7 +161,7 @@ export function useCandles(symbol: string, timeframe: TimeframeType = "1D") {
     } finally {
       if (requestSeq.current === mySeq) setLoading(false);
     }
-  }, [symbol, timeframe, candles.length]);
+  }, [symbol, timeframe]);
 
   useEffect(() => {
     fetchCandles();
