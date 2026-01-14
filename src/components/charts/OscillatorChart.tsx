@@ -130,13 +130,13 @@ export function MACDChart({ data, height = 120 }: { data: EnrichedCandle[]; heig
           {/* Histogram bars */}
           <Bar 
             dataKey="histogramPositive" 
-            fill="hsl(142, 71%, 45%)" 
+            fill="hsl(var(--gain))" 
             opacity={0.7}
             barSize={3}
           />
           <Bar 
             dataKey="histogramNegative" 
-            fill="hsl(0, 72%, 51%)" 
+            fill="hsl(var(--loss))" 
             opacity={0.7}
             barSize={3}
           />

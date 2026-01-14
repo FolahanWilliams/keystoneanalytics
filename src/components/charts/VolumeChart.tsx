@@ -56,7 +56,7 @@ export function VolumeChart({ data, height = 60 }: VolumeChartProps) {
             {volumeData.map((entry, index) => (
               <Cell 
                 key={`cell-${index}`} 
-                fill={entry.isUp ? 'hsl(142, 71%, 45%)' : 'hsl(0, 72%, 51%)'} 
+                fill={entry.isUp ? 'hsl(var(--gain))' : 'hsl(var(--loss))'} 
                 opacity={0.5}
               />
             ))}
