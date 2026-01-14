@@ -292,7 +292,7 @@ export function PriceChart({
             const { x, y, width, height, payload } = props;
             if (!payload) return null;
 
-            const fill = payload.isUp ? 'hsl(142, 71%, 45%)' : 'hsl(0, 72%, 51%)';
+            const fill = payload.isUp ? 'hsl(var(--gain))' : 'hsl(var(--loss))';
             const barHeight = (priceRange.max - priceRange.min);
             const chartHeight = props.background?.height || 300;
 
