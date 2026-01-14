@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Settings as SettingsIcon, User, Bell, Shield, Palette, Loader2, CreditCard, Crown } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Shield, Palette, Loader2, CreditCard, Crown, ExternalLink, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -16,7 +17,16 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
-  const { tier, isPro } = useSubscription();
+  const { 
+    tier, 
+    isPro, 
+    isElite, 
+    subscription, 
+    openPortal, 
+    isPortalLoading,
+    syncSubscription,
+    isSyncing 
+  } = useSubscription();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -93,37 +103,106 @@ const Settings = () => {
 
       {/* Subscription Section */}
       <div className="glass-panel rounded-xl p-6 space-y-6">
-        <div className="flex items-center gap-3 pb-4 border-b border-border">
-          <CreditCard className="w-5 h-5 text-primary" />
-          <h2 className="font-semibold">Subscription</h2>
+        <div className="flex items-center justify-between pb-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <CreditCard className="w-5 h-5 text-primary" />
+            <h2 className="font-semibold">Subscription</h2>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => syncSubscription()}
+            disabled={isSyncing}
+            className="gap-2"
+          >
+            <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
+            Refresh
+          </Button>
         </div>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={cn(
-              "w-10 h-10 rounded-lg flex items-center justify-center",
-              isPro ? "bg-gradient-to-br from-amber-500/20 to-orange-500/20" : "bg-secondary"
+              "w-12 h-12 rounded-xl flex items-center justify-center",
+              isElite ? "bg-gradient-to-br from-amber-500/20 to-orange-500/20" :
+              isPro ? "bg-gradient-to-br from-blue-500/20 to-cyan-500/20" : 
+              "bg-secondary"
             )}>
               <Crown className={cn(
-                "w-5 h-5",
-                isPro ? "text-amber-400" : "text-muted-foreground"
+                "w-6 h-6",
+                isElite ? "text-amber-400" :
+                isPro ? "text-blue-400" : 
+                "text-muted-foreground"
               )} />
             </div>
             <div>
-              <p className="font-medium capitalize">{tier} Plan</p>
+              <div className="flex items-center gap-2">
+                <p className="font-semibold capitalize">{tier} Plan</p>
+                {isPro && (
+                  <Badge 
+                    variant="outline" 
+                    className={cn(
+                      "text-xs",
+                      isElite ? "border-amber-500/50 text-amber-400" : "border-blue-500/50 text-blue-400"
+                    )}
+                  >
+                    Active
+                  </Badge>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground">
-                {isPro ? "Full access to all features" : "Limited features"}
+                {isPro 
+                  ? subscription?.current_period_end 
+                    ? `Renews ${new Date(subscription.current_period_end).toLocaleDateString()}`
+                    : "Full access to all features"
+                  : "Limited features - upgrade for more"
+                }
               </p>
+              {subscription?.cancel_at_period_end && (
+                <p className="text-xs text-loss mt-1">
+                  Cancels at end of billing period
+                </p>
+              )}
             </div>
           </div>
-          {!isPro && (
-            <Link to="/pricing">
-              <Button className="bg-gradient-to-r from-amber-500 to-orange-500 text-black hover:from-amber-400 hover:to-orange-400">
-                Upgrade
+          <div className="flex gap-2">
+            {isPro ? (
+              <Button 
+                variant="outline"
+                onClick={() => openPortal()}
+                disabled={isPortalLoading}
+                className="gap-2"
+              >
+                {isPortalLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <ExternalLink className="w-4 h-4" />
+                )}
+                Manage
               </Button>
-            </Link>
-          )}
+            ) : (
+              <Link to="/pricing">
+                <Button className="bg-gradient-to-r from-amber-500 to-orange-500 text-black hover:from-amber-400 hover:to-orange-400">
+                  Upgrade
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
+
+        {/* Plan benefits */}
+        {isPro && (
+          <div className="pt-4 border-t border-border/50">
+            <p className="text-xs text-muted-foreground mb-2">Your {tier} benefits:</p>
+            <div className="flex flex-wrap gap-2">
+              {["Unlimited stocks", "AI Coach", "Real-time news", "Priority support"].slice(0, isElite ? 4 : 3).map(benefit => (
+                <Badge key={benefit} variant="secondary" className="text-xs">
+                  {benefit}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Profile Section */}

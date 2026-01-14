@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { 
   Check, 
   X, 
@@ -16,10 +16,13 @@ import {
   Share2,
   MessageSquare,
   Globe,
-  Shield
+  Shield,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSubscription } from "@/hooks/useSubscription";
+import { useSubscription, STRIPE_PRICES } from "@/hooks/useSubscription";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const tiers = [
   {
@@ -132,13 +135,48 @@ const features = [
 
 export default function Pricing() {
   const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
-  const { tier: currentTier, isLoading } = useSubscription();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { tier: currentTier, isLoading, createCheckout, isCheckoutLoading, syncSubscription } = useSubscription();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loadingTier, setLoadingTier] = useState<string | null>(null);
+
+  // Check if user is authenticated
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setIsAuthenticated(!!data.user);
+    });
+  }, []);
+
+  // Handle checkout result
+  useEffect(() => {
+    const checkout = searchParams.get("checkout");
+    if (checkout === "success") {
+      toast.success("Welcome to your new plan! Your subscription is now active.");
+      syncSubscription();
+    } else if (checkout === "cancelled") {
+      toast.info("Checkout cancelled. You can try again anytime.");
+    }
+  }, [searchParams, syncSubscription]);
 
   const getPrice = (monthlyPrice: number) => {
     if (billingPeriod === "yearly") {
-      return Math.floor(monthlyPrice * 10); // 2 months free
+      return Math.floor(monthlyPrice * 10);
     }
     return monthlyPrice;
+  };
+
+  const handleUpgrade = async (tierName: string) => {
+    if (!isAuthenticated) {
+      navigate("/auth");
+      return;
+    }
+
+    const priceId = tierName === "Pro" ? STRIPE_PRICES.pro : STRIPE_PRICES.elite;
+    setLoadingTier(tierName);
+    createCheckout(priceId);
+    // Reset loading after a delay (checkout opens in new tab)
+    setTimeout(() => setLoadingTier(null), 2000);
   };
 
   return (
@@ -256,7 +294,18 @@ export default function Pricing() {
                   )}
                 </div>
 
-                <Link to="/auth">
+                {tier.price === 0 ? (
+                  <Link to={isAuthenticated ? "/dashboard" : "/auth"}>
+                    <Button 
+                      className="w-full gap-2 mb-8"
+                      variant="outline"
+                      disabled={isCurrent}
+                    >
+                      {isCurrent ? "Current Plan" : "Get Started"}
+                      {!isCurrent && <ChevronRight className="w-4 h-4" />}
+                    </Button>
+                  </Link>
+                ) : (
                   <Button 
                     className={cn(
                       "w-full gap-2 mb-8",
@@ -265,18 +314,23 @@ export default function Pricing() {
                         : ""
                     )}
                     variant={tier.popular ? "default" : "outline"}
-                    disabled={isCurrent}
+                    disabled={isCurrent || loadingTier === tier.name}
+                    onClick={() => handleUpgrade(tier.name)}
                   >
-                    {isCurrent ? (
+                    {loadingTier === tier.name ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : isCurrent ? (
                       "Current Plan"
                     ) : (
                       <>
-                        {tier.price === 0 ? "Get Started" : "Upgrade"} 
-                        <ChevronRight className="w-4 h-4" />
+                        Upgrade <ChevronRight className="w-4 h-4" />
                       </>
                     )}
                   </Button>
-                </Link>
+                )}
 
                 <ul className="space-y-3">
                   {tier.features.map((feature) => (
