@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.fred-data]
 verify_jwt = false
+
+[functions.pulse-tutor]
+verify_jwt = false

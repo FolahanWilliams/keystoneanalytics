@@ -32,6 +32,11 @@ const Landing = () => {
           <span className="text-xl font-bold tracking-tight">Pulse Terminal</span>
         </Link>
         <div className="flex items-center gap-4">
+          <Link to="/academy">
+            <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+              Academy
+            </Button>
+          </Link>
           <Link to="/pricing">
             <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
               Pricing
