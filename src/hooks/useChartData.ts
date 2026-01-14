@@ -17,8 +17,8 @@ export type { Candle, TimeframeType, ChartIndicator, EnrichedCandle };
 export { timeframeConfig };
 export { defaultIndicators } from "@/config/indicators";
 
-// Client-side cache for candle data
-const candleCache = new DataCache<Candle[]>(60_000);
+// Client-side cache for candle data - shorter TTL to ensure fresh data on timeframe switch
+const candleCache = new DataCache<Candle[]>(30_000);
 
 export function useChartData(symbol: string, timeframe: TimeframeType) {
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -26,7 +26,6 @@ export function useChartData(symbol: string, timeframe: TimeframeType) {
   const [error, setError] = useState<string | null>(null);
 
   const requestSeq = useRef(0);
-  const hasRenderedDataRef = useRef(false);
   const lastKeyRef = useRef<string | null>(null);
 
   const fetchCandles = useCallback(async () => {
@@ -34,7 +33,6 @@ export function useChartData(symbol: string, timeframe: TimeframeType) {
       setCandles([]);
       setLoading(false);
       setError(null);
-      hasRenderedDataRef.current = false;
       lastKeyRef.current = null;
       return;
     }
@@ -43,24 +41,29 @@ export function useChartData(symbol: string, timeframe: TimeframeType) {
     const config = timeframeConfig[timeframe];
     const key = cacheKey(symbol, timeframe);
 
+    // If key changed, immediately clear old data to prevent flickering between old/new
+    if (lastKeyRef.current !== key) {
+      setCandles([]);
+      setLoading(true);
+      lastKeyRef.current = key;
+    }
+
+    // Check client cache
     const cached = candleCache.get(key);
     const cacheFresh = candleCache.isFresh(key);
 
-    if (lastKeyRef.current !== key && !cacheFresh) {
-      setCandles([]);
-      hasRenderedDataRef.current = false;
-    }
-    lastKeyRef.current = key;
-
-    if (cacheFresh && cached) {
+    if (cacheFresh && cached && cached.length > 0) {
+      // Use cached data immediately
       setCandles(cached);
-      hasRenderedDataRef.current = cached.length > 0;
+      setLoading(false);
+      return; // Skip API call if cache is fresh
     }
 
-    setLoading(!cacheFresh && !hasRenderedDataRef.current);
     setError(null);
 
     try {
+      console.log(`[ChartData] Fetching ${symbol} with resolution=${config.resolution}, days=${config.days}`);
+      
       const { data, error: fnError } = await supabase.functions.invoke("market-data", {
         body: {
           symbols: [symbol],
@@ -75,8 +78,9 @@ export function useChartData(symbol: string, timeframe: TimeframeType) {
       if (data?.error) throw new Error(data.error);
 
       const nextCandles: Candle[] = data?.candles || [];
+      console.log(`[ChartData] Received ${nextCandles.length} candles for ${symbol} ${timeframe}`);
+      
       setCandles(nextCandles);
-      hasRenderedDataRef.current = nextCandles.length > 0;
       candleCache.set(key, nextCandles);
     } catch (err) {
       if (requestSeq.current !== mySeq) return;
