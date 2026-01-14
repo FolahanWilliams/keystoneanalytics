@@ -27,6 +27,85 @@ function validateType(type: unknown): type is "quotes" | "candles" | "search" {
   return type === "quotes" || type === "candles" || type === "search";
 }
 
+// ---- Candle aggregation helpers (makes unsupported provider resolutions still work) ----
+
+type RawCandle = {
+  timestamp: number; // seconds
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+};
+
+function bucketStartTs(resolution: string, tsSec: number): number {
+  const date = new Date(tsSec * 1000);
+
+  switch (resolution) {
+    case "240": {
+      const bucket = Math.floor(tsSec / (4 * 60 * 60)) * (4 * 60 * 60);
+      return bucket;
+    }
+    case "W": {
+      // Monday 00:00 UTC
+      const day = date.getUTCDay(); // 0=Sun
+      const diffToMonday = (day + 6) % 7;
+      const monday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+      monday.setUTCDate(monday.getUTCDate() - diffToMonday);
+      return Math.floor(monday.getTime() / 1000);
+    }
+    case "M": {
+      const monthStart = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+      return Math.floor(monthStart.getTime() / 1000);
+    }
+    default:
+      return tsSec;
+  }
+}
+
+function aggregateCandles(raw: RawCandle[], targetResolution: string): RawCandle[] {
+  if (raw.length === 0) return [];
+  if (!["240", "W", "M"].includes(targetResolution)) return raw;
+
+  const byBucket = new Map<number, RawCandle & { _firstTs: number; _lastTs: number }>();
+
+  for (const c of raw) {
+    const bucket = bucketStartTs(targetResolution, c.timestamp);
+    const existing = byBucket.get(bucket);
+    if (!existing) {
+      byBucket.set(bucket, {
+        timestamp: bucket,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: c.volume,
+        _firstTs: c.timestamp,
+        _lastTs: c.timestamp,
+      });
+      continue;
+    }
+
+    // Update OHLCV
+    if (c.timestamp < existing._firstTs) {
+      existing._firstTs = c.timestamp;
+      existing.open = c.open;
+    }
+    if (c.timestamp > existing._lastTs) {
+      existing._lastTs = c.timestamp;
+      existing.close = c.close;
+    }
+
+    existing.high = Math.max(existing.high, c.high);
+    existing.low = Math.min(existing.low, c.low);
+    existing.volume += c.volume;
+  }
+
+  return Array.from(byBucket.values())
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .map(({ _firstTs: _a, _lastTs: _b, ...rest }) => rest);
+}
+
 // Get appropriate date format based on resolution
 function getDateFormat(resolution: string): Intl.DateTimeFormatOptions {
   switch (resolution) {
@@ -165,21 +244,67 @@ serve(async (req) => {
       console.log(`Finnhub candle response for ${symbol}:`, finnhubData.s);
 
       // If Finnhub has data, use it
-      if (finnhubData.s === "ok" && finnhubData.t?.length > 0) {
-        const dateFormat = getDateFormat(candleResolution);
-        const candles = finnhubData.t.map((timestamp: number, i: number) => ({
-          date: formatDate(timestamp * 1000, dateFormat),
+      const mapFinnhubToRaw = (fd: any): RawCandle[] => {
+        return (fd.t || []).map((timestamp: number, i: number) => ({
           timestamp,
-          open: finnhubData.o[i],
-          high: finnhubData.h[i],
-          low: finnhubData.l[i],
-          close: finnhubData.c[i],
-          volume: finnhubData.v[i],
+          open: fd.o[i],
+          high: fd.h[i],
+          low: fd.l[i],
+          close: fd.c[i],
+          volume: fd.v[i],
+        }));
+      };
+
+      if (finnhubData.s === "ok" && finnhubData.t?.length > 0) {
+        const raw = mapFinnhubToRaw(finnhubData);
+        const finalRaw = aggregateCandles(raw, candleResolution);
+        const dateFormat = getDateFormat(candleResolution);
+
+        const candles = finalRaw.map((c) => ({
+          date: formatDate(c.timestamp * 1000, dateFormat),
+          timestamp: c.timestamp,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          volume: c.volume,
         }));
 
         return new Response(JSON.stringify({ candles, resolution: candleResolution }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+
+      // If the provider doesn't support this resolution, synthesize it from a supported base resolution
+      if (["240", "W", "M"].includes(candleResolution)) {
+        const baseResolution = candleResolution === "240" ? "60" : "D";
+        console.log(`No data for resolution=${candleResolution}; retrying with base=${baseResolution} and aggregating`);
+
+        const baseRes = await fetch(
+          `https://finnhub.io/api/v1/stock/candle?symbol=${encodedSymbol}&resolution=${baseResolution}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`
+        );
+        const baseData = await baseRes.json();
+
+        if (baseData.s === "ok" && baseData.t?.length > 0) {
+          const raw = mapFinnhubToRaw(baseData);
+          const aggregated = aggregateCandles(raw, candleResolution);
+          const dateFormat = getDateFormat(candleResolution);
+
+          const candles = aggregated.map((c) => ({
+            date: formatDate(c.timestamp * 1000, dateFormat),
+            timestamp: c.timestamp,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume,
+          }));
+
+          return new Response(
+            JSON.stringify({ candles, resolution: candleResolution, aggregatedFrom: baseResolution }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
 
       // Fallback to Alpha Vantage for historical data
