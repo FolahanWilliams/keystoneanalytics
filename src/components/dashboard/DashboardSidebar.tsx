@@ -10,7 +10,8 @@ import {
   Calculator,
   BarChart3,
   GraduationCap,
-  Crown
+  Crown,
+  Brain
 } from "lucide-react";
 import { NavLink, useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +22,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Overview", path: "/dashboard" },
+  { icon: Brain, label: "AI Coach", path: "/dashboard/coach", highlight: true },
   { icon: Star, label: "Watchlist", path: "/dashboard/watchlist" },
   { icon: Newspaper, label: "News", path: "/dashboard/news" },
   { icon: BarChart3, label: "Analysis", path: "/dashboard/analysis" },
@@ -66,12 +68,20 @@ const DashboardSidebar = () => {
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                 isActive
                   ? "bg-sidebar-accent text-primary"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                item.highlight && !isActive && "bg-primary/5 border border-primary/20 hover:border-primary/40"
               )
             }
           >
-            <item.icon className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span>{item.label}</span>}
+            <item.icon className={cn("w-5 h-5 flex-shrink-0", item.highlight && "text-primary")} />
+            {!collapsed && (
+              <span className={cn(item.highlight && "text-primary font-semibold")}>{item.label}</span>
+            )}
+            {item.highlight && !collapsed && (
+              <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-medium">
+                NEW
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

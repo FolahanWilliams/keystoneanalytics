@@ -14,6 +14,7 @@ import Analysis from "./pages/dashboard/Analysis";
 import CalculatorPage from "./pages/dashboard/CalculatorPage";
 import Settings from "./pages/dashboard/Settings";
 import Learn from "./pages/dashboard/Learn";
+import Coach from "./pages/dashboard/Coach";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/dashboard" element={<Dashboard />}>
             <Route index element={<Overview />} />
+            <Route path="coach" element={<Coach />} />
             <Route path="watchlist" element={<Watchlist />} />
             <Route path="news" element={<News />} />
             <Route path="analysis" element={<Analysis />} />

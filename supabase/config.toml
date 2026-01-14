@@ -1,1 +1,13 @@
 project_id = "qtmqkggfnpksdqsfkncx"
+
+[functions.market-data]
+verify_jwt = false
+
+[functions.stock-coach]
+verify_jwt = false
+
+[functions.market-news]
+verify_jwt = false
+
+[functions.education]
+verify_jwt = false
