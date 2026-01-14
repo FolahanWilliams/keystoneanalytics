@@ -4,7 +4,6 @@ import AdvancedChart from "@/components/charts/AdvancedChart";
 import WatchlistWidget from "@/components/dashboard/WatchlistWidget";
 import NewsFeed from "@/components/dashboard/NewsFeed";
 import { Activity, Zap, BarChart3 } from "lucide-react";
-import { useQuotes } from "@/hooks/useMarketData";
 
 interface OutletContextType {
   urlSymbol?: string | null;
@@ -15,7 +14,6 @@ const Overview = () => {
   const urlSymbol = context?.urlSymbol;
   
   const [selectedSymbol, setSelectedSymbol] = useState("AAPL");
-  const { quotes } = useQuotes([selectedSymbol]);
   
   // Use URL symbol if provided
   useEffect(() => {
@@ -23,8 +21,6 @@ const Overview = () => {
       setSelectedSymbol(urlSymbol);
     }
   }, [urlSymbol]);
-  
-  const quote = quotes[0];
 
   return (
     <div className="space-y-6">
