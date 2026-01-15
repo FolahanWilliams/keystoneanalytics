@@ -26,6 +26,80 @@ export function useAcademyProgress() {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
+  // Migrate localStorage progress to database
+  const migrateLocalStorageToDb = async (uid: string) => {
+    try {
+      const stored = localStorage.getItem("pulse-academy-progress");
+      if (!stored) return false;
+
+      const parsed = JSON.parse(stored);
+      const localModules = parsed.modules || (parsed.quizzes ? {} : parsed);
+      const localQuizzes = parsed.quizzes || {};
+
+      const hasLocalData = Object.keys(localModules).length > 0 || Object.keys(localQuizzes).length > 0;
+      if (!hasLocalData) return false;
+
+      // Check if user already has data in database
+      const { data: existingModules } = await supabase
+        .from("academy_progress")
+        .select("module_id")
+        .eq("user_id", uid)
+        .limit(1);
+
+      const { data: existingQuizzes } = await supabase
+        .from("academy_quizzes")
+        .select("level")
+        .eq("user_id", uid)
+        .limit(1);
+
+      const hasDbData = (existingModules?.length || 0) > 0 || (existingQuizzes?.length || 0) > 0;
+      
+      // Only migrate if user has no existing database data
+      if (hasDbData) return false;
+
+      // Migrate modules
+      const moduleInserts = Object.values(localModules).map((mod: any) => ({
+        user_id: uid,
+        module_id: mod.moduleId,
+        completed: mod.completed,
+        completed_at: mod.completedAt || null,
+      }));
+
+      if (moduleInserts.length > 0) {
+        const { error: moduleError } = await supabase
+          .from("academy_progress")
+          .upsert(moduleInserts, { onConflict: "user_id,module_id" });
+        
+        if (moduleError) throw moduleError;
+      }
+
+      // Migrate quizzes
+      const quizInserts = Object.values(localQuizzes).map((quiz: any) => ({
+        user_id: uid,
+        level: quiz.level,
+        passed: quiz.passed,
+        score: quiz.score,
+        completed_at: quiz.completedAt,
+      }));
+
+      if (quizInserts.length > 0) {
+        const { error: quizError } = await supabase
+          .from("academy_quizzes")
+          .upsert(quizInserts, { onConflict: "user_id,level" });
+        
+        if (quizError) throw quizError;
+      }
+
+      // Clear localStorage after successful migration
+      localStorage.removeItem("pulse-academy-progress");
+      
+      return true;
+    } catch (error) {
+      console.error("Error migrating localStorage to database:", error);
+      return false;
+    }
+  };
+
   // Get current user and load progress
   useEffect(() => {
     const loadUserAndProgress = async () => {
@@ -34,9 +108,16 @@ export function useAcademyProgress() {
         
         if (user) {
           setUserId(user.id);
+          // Try to migrate localStorage data first
+          const migrated = await migrateLocalStorageToDb(user.id);
+          if (migrated) {
+            toast({
+              title: "Progress Synced",
+              description: "Your learning progress has been saved to your account.",
+            });
+          }
           await loadProgressFromDb(user.id);
         } else {
-          // Fallback to localStorage for non-authenticated users
           loadFromLocalStorage();
         }
       } catch (error) {
@@ -54,6 +135,16 @@ export function useAcademyProgress() {
       async (event, session) => {
         if (session?.user) {
           setUserId(session.user.id);
+          // Migrate on sign in/sign up
+          if (event === "SIGNED_IN") {
+            const migrated = await migrateLocalStorageToDb(session.user.id);
+            if (migrated) {
+              toast({
+                title: "Progress Synced",
+                description: "Your learning progress has been saved to your account.",
+              });
+            }
+          }
           await loadProgressFromDb(session.user.id);
         } else {
           setUserId(null);
