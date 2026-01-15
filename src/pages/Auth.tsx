@@ -4,15 +4,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Activity, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
+import { Activity, Mail, Lock, ArrowRight, Loader2, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
 
+type AuthMode = "login" | "signup" | "forgot-password";
+
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,6 +38,16 @@ const Auth = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  const validateEmail = () => {
+    const emailResult = emailSchema.safeParse(email);
+    if (!emailResult.success) {
+      setErrors({ email: emailResult.error.errors[0].message });
+      return false;
+    }
+    setErrors({});
+    return true;
+  };
+
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
     
@@ -53,6 +65,43 @@ const Auth = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateEmail()) return;
+    
+    setLoading(true);
+
+    try {
+      const response = await supabase.functions.invoke("send-password-reset", {
+        body: {
+          email,
+          redirectTo: `${window.location.origin}/auth`,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      toast({
+        title: "Check Your Email",
+        description: "If an account exists with this email, you'll receive a password reset link.",
+      });
+      
+      setMode("login");
+      setEmail("");
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to send reset email. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -61,7 +110,7 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -98,7 +147,7 @@ const Auth = () => {
               description: "This email is already registered. Please sign in instead.",
               variant: "destructive",
             });
-            setIsLogin(true);
+            setMode("login");
           } else {
             toast({
               title: "Error",
@@ -124,6 +173,148 @@ const Auth = () => {
     }
   };
 
+  const renderForgotPassword = () => (
+    <form onSubmit={handleForgotPassword} className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            id="email"
+            type="email"
+            placeholder="trader@example.com"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setErrors((prev) => ({ ...prev, email: undefined }));
+            }}
+            className="pl-10 bg-secondary/50 border-border focus:border-primary"
+          />
+        </div>
+        {errors.email && (
+          <p className="text-sm text-destructive">{errors.email}</p>
+        )}
+      </div>
+
+      <Button
+        type="submit"
+        className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-12 gap-2"
+        disabled={loading}
+      >
+        {loading ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <>
+            Send Reset Link
+            <ArrowRight className="w-4 h-4" />
+          </>
+        )}
+      </Button>
+
+      <button
+        type="button"
+        onClick={() => setMode("login")}
+        className="flex items-center justify-center gap-2 w-full text-sm text-muted-foreground hover:text-primary transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to Sign In
+      </button>
+    </form>
+  );
+
+  const renderAuthForm = () => (
+    <form onSubmit={handleAuth} className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            id="email"
+            type="email"
+            placeholder="trader@example.com"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setErrors((prev) => ({ ...prev, email: undefined }));
+            }}
+            className="pl-10 bg-secondary/50 border-border focus:border-primary"
+          />
+        </div>
+        {errors.email && (
+          <p className="text-sm text-destructive">{errors.email}</p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="password">Password</Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            id="password"
+            type="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setErrors((prev) => ({ ...prev, password: undefined }));
+            }}
+            className="pl-10 bg-secondary/50 border-border focus:border-primary"
+          />
+        </div>
+        {errors.password && (
+          <p className="text-sm text-destructive">{errors.password}</p>
+        )}
+      </div>
+
+      {mode === "login" && (
+        <button
+          type="button"
+          onClick={() => setMode("forgot-password")}
+          className="text-sm text-primary hover:text-primary/80 transition-colors"
+        >
+          Forgot your password?
+        </button>
+      )}
+
+      <Button
+        type="submit"
+        className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-12 gap-2"
+        disabled={loading}
+      >
+        {loading ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <>
+            {mode === "login" ? "Sign In" : "Create Account"}
+            <ArrowRight className="w-4 h-4" />
+          </>
+        )}
+      </Button>
+    </form>
+  );
+
+  const getTitle = () => {
+    switch (mode) {
+      case "forgot-password":
+        return "Reset Password";
+      case "signup":
+        return "Create Account";
+      default:
+        return "Welcome Back";
+    }
+  };
+
+  const getSubtitle = () => {
+    switch (mode) {
+      case "forgot-password":
+        return "Enter your email to receive a password reset link";
+      case "signup":
+        return "Get started with Pulse Terminal";
+      default:
+        return "Sign in to access your trading terminal";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
       {/* Background effects */}
@@ -141,86 +332,25 @@ const Auth = () => {
         {/* Auth Card */}
         <div className="glass-panel rounded-2xl p-8">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold">
-              {isLogin ? "Welcome Back" : "Create Account"}
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              {isLogin
-                ? "Sign in to access your trading terminal"
-                : "Get started with Pulse Terminal"}
-            </p>
+            <h1 className="text-2xl font-bold">{getTitle()}</h1>
+            <p className="text-muted-foreground mt-2">{getSubtitle()}</p>
           </div>
 
-          <form onSubmit={handleAuth} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="trader@example.com"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setErrors((prev) => ({ ...prev, email: undefined }));
-                  }}
-                  className="pl-10 bg-secondary/50 border-border focus:border-primary"
-                />
-              </div>
-              {errors.email && (
-                <p className="text-sm text-destructive">{errors.email}</p>
-              )}
+          {mode === "forgot-password" ? renderForgotPassword() : renderAuthForm()}
+
+          {mode !== "forgot-password" && (
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => setMode(mode === "login" ? "signup" : "login")}
+                className="text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                {mode === "login"
+                  ? "Don't have an account? Sign up"
+                  : "Already have an account? Sign in"}
+              </button>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setErrors((prev) => ({ ...prev, password: undefined }));
-                  }}
-                  className="pl-10 bg-secondary/50 border-border focus:border-primary"
-                />
-              </div>
-              {errors.password && (
-                <p className="text-sm text-destructive">{errors.password}</p>
-              )}
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-12 gap-2"
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  {isLogin ? "Sign In" : "Create Account"}
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-muted-foreground hover:text-primary transition-colors"
-            >
-              {isLogin
-                ? "Don't have an account? Sign up"
-                : "Already have an account? Sign in"}
-            </button>
-          </div>
+          )}
         </div>
 
         <p className="mt-8 text-center text-sm text-muted-foreground">
