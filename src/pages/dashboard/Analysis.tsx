@@ -4,6 +4,7 @@ import { DecisionEngineVerdict } from "@/components/premium/DecisionEngineVerdic
 import { StockChatWidget } from "@/components/coach/StockChatWidget";
 import { StockSearch } from "@/components/dashboard/StockSearch";
 import { StockResearchPanel } from "@/components/research/StockResearchPanel";
+import { CompanyFundamentals } from "@/components/dashboard/CompanyFundamentals";
 import { BarChart3 } from "lucide-react";
 import { useQuotes } from "@/hooks/useMarketData";
 
@@ -40,7 +41,7 @@ const Analysis = () => {
           />
         </div>
 
-        {/* Right sidebar - Research + AI Chat stacked compactly */}
+        {/* Right sidebar - Fundamentals, Research + AI Chat stacked */}
         <div className="xl:col-span-4 flex flex-col gap-4">
           {/* Decision Engine Verdict */}
           <DecisionEngineVerdict 
@@ -49,6 +50,9 @@ const Analysis = () => {
             change={quote?.change}
             changePercent={quote?.changePercent}
           />
+
+          {/* Company Fundamentals */}
+          <CompanyFundamentals symbol={selectedSymbol} />
 
           {/* Web Research Panel + AI Chat in a compact layout */}
           <div className="grid grid-cols-1 gap-4">
