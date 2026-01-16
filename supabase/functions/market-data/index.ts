@@ -23,8 +23,8 @@ function validateSymbols(symbols: unknown): symbols is string[] {
   );
 }
 
-function validateType(type: unknown): type is "quotes" | "candles" | "search" {
-  return type === "quotes" || type === "candles" || type === "search";
+function validateType(type: unknown): type is "quotes" | "candles" | "search" | "fundamentals" {
+  return type === "quotes" || type === "candles" || type === "search" || type === "fundamentals";
 }
 
 // ======================= In-memory candle cache =======================
@@ -293,6 +293,77 @@ serve(async (req) => {
       return new Response(JSON.stringify({ quotes }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Fetch company fundamentals from FMP
+    if (type === "fundamentals") {
+      const symbol = symbols[0];
+      const encodedSymbol = encodeURIComponent(symbol.toUpperCase());
+
+      if (!FMP_API_KEY) {
+        return new Response(
+          JSON.stringify({ error: "Fundamentals data requires FMP API key" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      try {
+        // Fetch company profile and key metrics in parallel
+        const [profileRes, metricsRes, incomeRes] = await Promise.all([
+          fetch(`https://financialmodelingprep.com/api/v3/profile/${encodedSymbol}?apikey=${FMP_API_KEY}`),
+          fetch(`https://financialmodelingprep.com/api/v3/key-metrics-ttm/${encodedSymbol}?apikey=${FMP_API_KEY}`),
+          fetch(`https://financialmodelingprep.com/api/v3/income-statement/${encodedSymbol}?limit=1&apikey=${FMP_API_KEY}`)
+        ]);
+
+        const [profileData, metricsData, incomeData] = await Promise.all([
+          profileRes.json(),
+          metricsRes.json(),
+          incomeRes.json()
+        ]);
+
+        const profile = Array.isArray(profileData) ? profileData[0] : null;
+        const metrics = Array.isArray(metricsData) ? metricsData[0] : null;
+        const income = Array.isArray(incomeData) ? incomeData[0] : null;
+
+        if (!profile) {
+          return new Response(
+            JSON.stringify({ error: `No fundamentals data found for ${symbol}` }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const fundamentals = {
+          symbol: profile.symbol,
+          companyName: profile.companyName,
+          sector: profile.sector,
+          industry: profile.industry,
+          marketCap: profile.mktCap,
+          pe: profile.pe || metrics?.peRatioTTM,
+          eps: income?.eps || metrics?.netIncomePerShareTTM,
+          revenue: income?.revenue || metrics?.revenuePerShareTTM * (profile.mktCap / profile.price),
+          netIncome: income?.netIncome,
+          profitMargin: metrics?.netProfitMarginTTM || (income?.netIncome / income?.revenue),
+          beta: profile.beta,
+          dividendYield: profile.lastDiv ? profile.lastDiv / profile.price : 0,
+          employees: profile.fullTimeEmployees,
+          exchange: profile.exchange,
+          country: profile.country,
+          description: profile.description,
+          website: profile.website,
+        };
+
+        console.log(`FMP fundamentals for ${symbol}: ${profile.companyName}`);
+
+        return new Response(JSON.stringify({ fundamentals }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (error) {
+        console.error(`Error fetching fundamentals for ${symbol}:`, error);
+        return new Response(
+          JSON.stringify({ error: "Failed to fetch fundamentals data" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Fetch candlestick data for a single symbol
