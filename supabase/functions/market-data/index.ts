@@ -210,38 +210,79 @@ serve(async (req) => {
       );
     }
 
+    const FMP_API_KEY = Deno.env.get("FMP_API_KEY");
     const FINNHUB_API_KEY = Deno.env.get("FINHUB_API_KEY");
 
-    if (!FINNHUB_API_KEY) {
-      console.error("FINHUB_API_KEY is not configured");
+    if (!FMP_API_KEY && !FINNHUB_API_KEY) {
+      console.error("No market data API keys configured");
       return new Response(
         JSON.stringify({ error: "Service configuration error" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Fetch quotes for multiple symbols
+    // Fetch quotes for multiple symbols - FMP primary, Finnhub fallback
     if (type === "quotes") {
       const quotes = await Promise.all(
         symbols.map(async (symbol: string) => {
           try {
             const encodedSymbol = encodeURIComponent(symbol.toUpperCase());
-            const response = await fetch(
-              `https://finnhub.io/api/v1/quote?symbol=${encodedSymbol}&token=${FINNHUB_API_KEY}`
-            );
-            const data = await response.json();
+            
+            // Primary: Financial Modeling Prep for real-time data
+            if (FMP_API_KEY) {
+              try {
+                const fmpResponse = await fetch(
+                  `https://financialmodelingprep.com/api/v3/quote/${encodedSymbol}?apikey=${FMP_API_KEY}`
+                );
+                const fmpData = await fmpResponse.json();
+                
+                if (Array.isArray(fmpData) && fmpData.length > 0) {
+                  const q = fmpData[0];
+                  return {
+                    symbol,
+                    price: q.price || 0,
+                    change: q.change || 0,
+                    changePercent: q.changesPercentage || 0,
+                    high: q.dayHigh || 0,
+                    low: q.dayLow || 0,
+                    open: q.open || 0,
+                    previousClose: q.previousClose || 0,
+                    timestamp: q.timestamp || Date.now() / 1000,
+                    marketCap: q.marketCap,
+                    pe: q.pe,
+                    eps: q.eps,
+                    volume: q.volume,
+                    avgVolume: q.avgVolume,
+                    yearHigh: q.yearHigh,
+                    yearLow: q.yearLow,
+                  };
+                }
+              } catch (fmpError) {
+                console.error(`FMP error for ${symbol}:`, fmpError);
+              }
+            }
+            
+            // Fallback: Finnhub
+            if (FINNHUB_API_KEY) {
+              const response = await fetch(
+                `https://finnhub.io/api/v1/quote?symbol=${encodedSymbol}&token=${FINNHUB_API_KEY}`
+              );
+              const data = await response.json();
 
-            return {
-              symbol,
-              price: data.c || 0,
-              change: data.d || 0,
-              changePercent: data.dp || 0,
-              high: data.h || 0,
-              low: data.l || 0,
-              open: data.o || 0,
-              previousClose: data.pc || 0,
-              timestamp: data.t || Date.now() / 1000,
-            };
+              return {
+                symbol,
+                price: data.c || 0,
+                change: data.d || 0,
+                changePercent: data.dp || 0,
+                high: data.h || 0,
+                low: data.l || 0,
+                open: data.o || 0,
+                previousClose: data.pc || 0,
+                timestamp: data.t || Date.now() / 1000,
+              };
+            }
+            
+            return { symbol, error: true };
           } catch (error) {
             console.error(`Error fetching ${symbol}:`, error);
             return { symbol, error: true };
@@ -280,6 +321,73 @@ serve(async (req) => {
 
       console.log(`Fetching ${symbol} candles: resolution=${candleResolution}, days=${candleDays}`);
 
+      // Primary: Try FMP for historical candles (daily resolution)
+      if (FMP_API_KEY && (candleResolution === "D" || candleResolution === "W" || candleResolution === "M")) {
+        try {
+          const fmpHistRes = await fetch(
+            `https://financialmodelingprep.com/api/v3/historical-price-full/${encodedSymbol}?timeseries=${candleDays * 2}&apikey=${FMP_API_KEY}`
+          );
+          const fmpHistData = await fmpHistRes.json();
+          
+          if (fmpHistData.historical && fmpHistData.historical.length > 0) {
+            const dateFormat = getDateFormat(candleResolution);
+            let rawCandles = fmpHistData.historical.slice(0, candleDays).reverse();
+            
+            // Aggregate for weekly/monthly if needed
+            if (candleResolution === "W" || candleResolution === "M") {
+              const raw: RawCandle[] = rawCandles.map((d: any) => ({
+                timestamp: new Date(d.date).getTime() / 1000,
+                open: d.open,
+                high: d.high,
+                low: d.low,
+                close: d.close,
+                volume: d.volume,
+              }));
+              const aggregated = aggregateCandles(raw, candleResolution);
+              
+              const candles = aggregated.map((c) => ({
+                date: formatDate(c.timestamp * 1000, dateFormat),
+                timestamp: c.timestamp,
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close,
+                volume: c.volume,
+              }));
+              
+              const payload = { candles, resolution: candleResolution, source: "fmp" };
+              setCache(cacheKey, payload);
+              console.log(`FMP ${candleResolution} candles for ${symbol}: ${candles.length} (aggregated)`);
+              
+              return new Response(JSON.stringify(payload), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
+            
+            const candles = rawCandles.map((d: any) => ({
+              date: formatDate(new Date(d.date).getTime(), dateFormat),
+              timestamp: new Date(d.date).getTime() / 1000,
+              open: d.open,
+              high: d.high,
+              low: d.low,
+              close: d.close,
+              volume: d.volume,
+            }));
+            
+            const payload = { candles, resolution: candleResolution, source: "fmp" };
+            setCache(cacheKey, payload);
+            console.log(`FMP daily candles for ${symbol}: ${candles.length}`);
+            
+            return new Response(JSON.stringify(payload), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        } catch (fmpError) {
+          console.error(`FMP candles error for ${symbol}:`, fmpError);
+        }
+      }
+
+      // Fallback: Finnhub for intraday resolutions or if FMP fails
       const finnhubResponse = await fetch(
         `https://finnhub.io/api/v1/stock/candle?symbol=${encodedSymbol}&resolution=${candleResolution}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`
       );

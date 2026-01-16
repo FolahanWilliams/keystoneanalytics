@@ -142,36 +142,91 @@ function calculateEMA(data: number[], period: number): number {
   return ema;
 }
 
-// Fetch market data for a symbol
+// Fetch market data for a symbol using Financial Modeling Prep (primary) with fallbacks
 async function fetchMarketData(symbol: string): Promise<MarketData> {
+  const FMP_API_KEY = Deno.env.get("FMP_API_KEY");
   const FINNHUB_API_KEY = Deno.env.get("FINHUB_API_KEY");
   const ALPHA_VANTAGE_KEY = Deno.env.get("ALPHA_VANTAGE_API_KEY");
   
   const result: MarketData = { symbol };
+  const encodedSymbol = encodeURIComponent(symbol.toUpperCase());
 
   try {
-    // Fetch quote
-    const quoteRes = await fetch(
-      `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${FINNHUB_API_KEY}`
-    );
-    const quoteData = await quoteRes.json();
-    
-    if (quoteData.c && quoteData.c > 0) {
-      result.quote = {
-        price: quoteData.c,
-        change: quoteData.d || 0,
-        changePercent: quoteData.dp || 0,
-        high: quoteData.h || 0,
-        low: quoteData.l || 0,
-        open: quoteData.o || 0,
-        previousClose: quoteData.pc || 0,
-      };
+    // Primary: Financial Modeling Prep for real-time quote
+    if (FMP_API_KEY) {
+      try {
+        const fmpQuoteRes = await fetch(
+          `https://financialmodelingprep.com/api/v3/quote/${encodedSymbol}?apikey=${FMP_API_KEY}`
+        );
+        const fmpQuoteData = await fmpQuoteRes.json();
+        
+        if (Array.isArray(fmpQuoteData) && fmpQuoteData.length > 0) {
+          const q = fmpQuoteData[0];
+          result.quote = {
+            price: q.price || 0,
+            change: q.change || 0,
+            changePercent: q.changesPercentage || 0,
+            high: q.dayHigh || 0,
+            low: q.dayLow || 0,
+            open: q.open || 0,
+            previousClose: q.previousClose || 0,
+          };
+          console.log(`FMP quote for ${symbol}: $${q.price}`);
+        }
+      } catch (fmpError) {
+        console.error(`FMP quote error for ${symbol}:`, fmpError);
+      }
     }
 
-    // Fetch candles from Alpha Vantage for historical data
-    if (ALPHA_VANTAGE_KEY) {
+    // Fallback to Finnhub if FMP didn't return data
+    if (!result.quote && FINNHUB_API_KEY) {
+      const quoteRes = await fetch(
+        `https://finnhub.io/api/v1/quote?symbol=${encodedSymbol}&token=${FINNHUB_API_KEY}`
+      );
+      const quoteData = await quoteRes.json();
+      
+      if (quoteData.c && quoteData.c > 0) {
+        result.quote = {
+          price: quoteData.c,
+          change: quoteData.d || 0,
+          changePercent: quoteData.dp || 0,
+          high: quoteData.h || 0,
+          low: quoteData.l || 0,
+          open: quoteData.o || 0,
+          previousClose: quoteData.pc || 0,
+        };
+      }
+    }
+
+    // Fetch historical data from FMP (primary) or Alpha Vantage (fallback)
+    if (FMP_API_KEY) {
+      try {
+        const fmpHistRes = await fetch(
+          `https://financialmodelingprep.com/api/v3/historical-price-full/${encodedSymbol}?timeseries=60&apikey=${FMP_API_KEY}`
+        );
+        const fmpHistData = await fmpHistRes.json();
+        
+        if (fmpHistData.historical && fmpHistData.historical.length > 0) {
+          result.candles = fmpHistData.historical.slice(0, 30).reverse().map((d: any) => ({
+            date: d.date,
+            open: d.open,
+            high: d.high,
+            low: d.low,
+            close: d.close,
+            volume: d.volume,
+          }));
+          result.technicals = calculateTechnicals(result.candles) ?? undefined;
+          console.log(`FMP historical data for ${symbol}: ${result.candles?.length || 0} candles`);
+        }
+      } catch (fmpHistError) {
+        console.error(`FMP historical error for ${symbol}:`, fmpHistError);
+      }
+    }
+
+    // Fallback to Alpha Vantage for historical data
+    if (!result.candles && ALPHA_VANTAGE_KEY) {
       const avRes = await fetch(
-        `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(symbol)}&outputsize=compact&apikey=${ALPHA_VANTAGE_KEY}`
+        `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodedSymbol}&outputsize=compact&apikey=${ALPHA_VANTAGE_KEY}`
       );
       const avData = await avRes.json();
       
@@ -190,8 +245,6 @@ async function fetchMarketData(symbol: string): Promise<MarketData> {
             volume: parseInt(d["5. volume"]),
           };
         });
-
-        // Calculate technicals from candles
         result.technicals = calculateTechnicals(result.candles) ?? undefined;
       }
     }
