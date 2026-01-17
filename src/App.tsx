@@ -1,61 +1,79 @@
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Pricing from "./pages/Pricing";
-import Academy from "./pages/Academy";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import TermsOfService from "./pages/TermsOfService";
-import Overview from "./pages/dashboard/Overview";
-import Watchlist from "./pages/dashboard/Watchlist";
-import News from "./pages/dashboard/News";
-import Analysis from "./pages/dashboard/Analysis";
-import CalculatorPage from "./pages/dashboard/CalculatorPage";
-import Settings from "./pages/dashboard/Settings";
-import Learn from "./pages/dashboard/Learn";
-import Coach from "./pages/dashboard/Coach";
-import MacroOverview from "./pages/dashboard/MacroOverview";
-import NotFound from "./pages/NotFound";
+import ErrorBoundary from "@/components/common/ErrorBoundary";
+import PageLoader from "@/components/common/PageLoader";
 
-const queryClient = new QueryClient();
+// Lazy load route components for better performance
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const Academy = lazy(() => import("./pages/Academy"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
+// Dashboard sub-routes
+const Overview = lazy(() => import("./pages/dashboard/Overview"));
+const Watchlist = lazy(() => import("./pages/dashboard/Watchlist"));
+const News = lazy(() => import("./pages/dashboard/News"));
+const Analysis = lazy(() => import("./pages/dashboard/Analysis"));
+const CalculatorPage = lazy(() => import("./pages/dashboard/CalculatorPage"));
+const Settings = lazy(() => import("./pages/dashboard/Settings"));
+const Learn = lazy(() => import("./pages/dashboard/Learn"));
+const Coach = lazy(() => import("./pages/dashboard/Coach"));
+const MacroOverview = lazy(() => import("./pages/dashboard/MacroOverview"));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      staleTime: 1000 * 60 * 5, // 5 minutes
+    },
+  },
+});
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/academy" element={<Academy />} />
-            <Route path="/privacy" element={<PrivacyPolicy />} />
-            <Route path="/terms" element={<TermsOfService />} />
-            <Route path="/dashboard" element={<Dashboard />}>
-              <Route index element={<Overview />} />
-              <Route path="coach" element={<Coach />} />
-              <Route path="watchlist" element={<Watchlist />} />
-              <Route path="news" element={<News />} />
-              <Route path="analysis" element={<Analysis />} />
-              <Route path="macro" element={<MacroOverview />} />
-              <Route path="calculator" element={<CalculatorPage />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="learn" element={<Learn />} />
-            </Route>
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/pricing" element={<Pricing />} />
+                <Route path="/academy" element={<Academy />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/dashboard" element={<Dashboard />}>
+                  <Route index element={<Overview />} />
+                  <Route path="coach" element={<Coach />} />
+                  <Route path="watchlist" element={<Watchlist />} />
+                  <Route path="news" element={<News />} />
+                  <Route path="analysis" element={<Analysis />} />
+                  <Route path="macro" element={<MacroOverview />} />
+                  <Route path="calculator" element={<CalculatorPage />} />
+                  <Route path="settings" element={<Settings />} />
+                  <Route path="learn" element={<Learn />} />
+                </Route>
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
