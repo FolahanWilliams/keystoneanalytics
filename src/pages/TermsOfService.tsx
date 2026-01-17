@@ -9,7 +9,7 @@ const TermsOfService = () => {
       <nav className="flex items-center justify-between px-6 py-4 lg:px-12 border-b border-border/50">
         <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <Activity className="w-8 h-8 text-primary" />
-          <span className="text-xl font-bold tracking-tight">Pulse Terminal</span>
+          <span className="text-xl font-bold tracking-tight">Keystone Analytics</span>
         </Link>
         <Link to="/">
           <Button variant="ghost" className="gap-2">
@@ -27,7 +27,7 @@ const TermsOfService = () => {
           <section>
             <h2 className="text-2xl font-semibold mb-4">1. Agreement to Terms</h2>
             <p className="text-muted-foreground leading-relaxed">
-              By accessing or using Pulse Terminal, you agree to be bound by these Terms of Service. 
+              By accessing or using Keystone Analytics, you agree to be bound by these Terms of Service. 
               If you disagree with any part of the terms, you may not access the service.
             </p>
           </section>
@@ -35,7 +35,7 @@ const TermsOfService = () => {
           <section>
             <h2 className="text-2xl font-semibold mb-4">2. Description of Service</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Pulse Terminal is a trading intelligence platform that provides market data, 
+              Keystone Analytics is a trading intelligence platform that provides market data, 
               technical analysis tools, charting capabilities, and educational resources. 
               Our service is designed to help traders make more informed decisions.
             </p>
@@ -44,7 +44,7 @@ const TermsOfService = () => {
           <section className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
             <h2 className="text-2xl font-semibold mb-4 text-destructive">3. Investment Disclaimer</h2>
             <p className="text-muted-foreground leading-relaxed">
-              <strong className="text-foreground">IMPORTANT:</strong> Pulse Terminal does not provide 
+              <strong className="text-foreground">IMPORTANT:</strong> Keystone Analytics does not provide 
               investment advice, financial advice, trading advice, or any other sort of advice. 
               The information provided by our platform is for informational and educational purposes only.
             </p>
@@ -96,7 +96,7 @@ const TermsOfService = () => {
             <h2 className="text-2xl font-semibold mb-4">7. Intellectual Property</h2>
             <p className="text-muted-foreground leading-relaxed">
               The service and its original content, features, and functionality are owned by 
-              Pulse Terminal and are protected by international copyright, trademark, and 
+              Keystone Analytics and are protected by international copyright, trademark, and 
               other intellectual property laws.
             </p>
           </section>
@@ -113,7 +113,7 @@ const TermsOfService = () => {
           <section>
             <h2 className="text-2xl font-semibold mb-4">9. Limitation of Liability</h2>
             <p className="text-muted-foreground leading-relaxed">
-              In no event shall Pulse Terminal, its directors, employees, partners, agents, 
+              In no event shall Keystone Analytics, its directors, employees, partners, agents, 
               or affiliates be liable for any indirect, incidental, special, consequential, 
               or punitive damages, including loss of profits, data, or goodwill, arising from 
               your use of the service.
@@ -143,7 +143,7 @@ const TermsOfService = () => {
             <p className="text-muted-foreground leading-relaxed">
               If you have questions about these Terms, please contact us at:
             </p>
-            <p className="text-primary mt-2">legal@pulseterminal.app</p>
+            <p className="text-primary mt-2">legal@keystoneanalytics.org</p>
           </section>
         </div>
       </main>
@@ -151,7 +151,7 @@ const TermsOfService = () => {
       {/* Footer */}
       <footer className="px-6 py-8 border-t border-border/50">
         <div className="flex items-center justify-center text-sm text-muted-foreground">
-          <span>© 2026 Pulse Terminal. All rights reserved.</span>
+          <span>© 2026 Keystone Analytics. All rights reserved.</span>
         </div>
       </footer>
     </div>

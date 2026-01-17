@@ -54,7 +54,7 @@ export function ChartShareButton({ chartRef, symbol, price, changePercent }: Cha
         ctx.font = "bold 20px Inter, system-ui, sans-serif";
         ctx.fillStyle = "rgba(34, 197, 94, 0.8)";
         ctx.textAlign = "left";
-        ctx.fillText("📈 Pulse Terminal", 20, canvas.height - 20);
+        ctx.fillText("📈 Keystone Analytics", 20, canvas.height - 20);
 
         // Add timestamp
         ctx.font = "14px Inter, system-ui, sans-serif";
@@ -167,7 +167,7 @@ export function ChartShareButton({ chartRef, symbol, price, changePercent }: Cha
       if (blob) {
         const file = new File([blob], `${symbol}-chart.png`, { type: "image/png" });
         await navigator.share({
-          title: `${symbol} Chart - Pulse Terminal`,
+          title: `${symbol} Chart - Keystone Analytics`,
           text: `Check out ${symbol} at $${price.toFixed(2)} (${changePercent >= 0 ? "+" : ""}${changePercent.toFixed(2)}%)`,
           files: [file],
         });

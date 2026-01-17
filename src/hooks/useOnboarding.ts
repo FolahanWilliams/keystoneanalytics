@@ -169,7 +169,7 @@ export const useOnboarding = () => {
       await addDefaultWatchlistStocks();
 
       toast({
-        title: "Welcome to Pulse Terminal! 🎉",
+        title: "Welcome to Keystone Analytics! 🎉",
         description: "We've added some popular stocks to your watchlist to get you started.",
       });
     } catch (error) {

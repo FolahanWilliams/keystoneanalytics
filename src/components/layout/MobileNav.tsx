@@ -33,7 +33,7 @@ export function MobileNav({ items }: MobileNavProps) {
               onClick={() => setOpen(false)}
             >
               <Activity className="w-6 h-6 text-primary" />
-              <span className="font-bold">Pulse Terminal</span>
+              <span className="font-bold">Keystone Analytics</span>
             </Link>
           </div>
           

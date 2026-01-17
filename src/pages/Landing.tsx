@@ -68,7 +68,7 @@ const Landing = () => {
           <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
             <TrendingUp className="w-5 h-5 text-primary" />
           </div>
-          <span className="text-xl font-bold tracking-tight">Pulse Terminal</span>
+          <span className="text-xl font-bold tracking-tight">Keystone Analytics</span>
         </Link>
         
         {/* Desktop Navigation */}
@@ -199,7 +199,7 @@ const Landing = () => {
             Ready to Trade Smarter?
           </h2>
           <p className="text-muted-foreground mb-8">
-            Join thousands of traders using Pulse Terminal to gain an edge in the markets.
+            Join thousands of traders using Keystone Analytics to gain an edge in the markets.
           </p>
           <Link to="/auth">
             <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8 h-12 text-base">
@@ -216,13 +216,13 @@ const Landing = () => {
             <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
               <TrendingUp className="w-3 h-3 text-primary" />
             </div>
-            <span className="text-sm">© 2026 Pulse Terminal</span>
+            <span className="text-sm">© 2026 Keystone Analytics</span>
           </div>
           <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm text-muted-foreground">
             <Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
             <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
             <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
-            <a href="mailto:support@pulseterminal.app" className="hover:text-foreground transition-colors">Contact</a>
+            <a href="mailto:support@keystoneanalytics.org" className="hover:text-foreground transition-colors">Contact</a>
           </div>
         </div>
       </footer>

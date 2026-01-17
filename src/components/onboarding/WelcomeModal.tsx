@@ -95,7 +95,7 @@ export const WelcomeModal = ({ isOpen, onStartTour, onSkip }: WelcomeModalProps)
                 transition={{ delay: 0.3 }}
                 className="relative text-2xl font-bold text-foreground mb-2"
               >
-                Welcome to Pulse Terminal
+                Welcome to Keystone Analytics
               </motion.h1>
 
               <motion.p

@@ -34,7 +34,7 @@ export function FinancialDisclaimer({ variant = "compact", className }: Financia
         </span>
       </div>
       <p className="text-xs text-muted-foreground leading-relaxed">
-        The information provided by Pulse Terminal is for informational and educational purposes only. 
+        The information provided by Keystone Analytics is for informational and educational purposes only. 
         It does not constitute investment advice, financial advice, or trading advice. 
         Any "verdicts," "signals," or AI-generated insights are algorithmic outputs and should not 
         be interpreted as professional recommendations. Past performance is not indicative of future results. 
