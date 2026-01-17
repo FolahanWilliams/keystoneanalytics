@@ -191,7 +191,7 @@ const Auth = () => {
           });
         }
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: `${window.location.origin}/dashboard` },
@@ -209,9 +209,14 @@ const Auth = () => {
             toast({ title: "Error", description: error.message, variant: "destructive" });
           }
         } else {
+          // Send welcome email in background (don't await to avoid blocking)
+          supabase.functions.invoke("send-welcome-email", {
+            body: { email },
+          }).catch((err) => console.error("Failed to send welcome email:", err));
+
           toast({
             title: "Account Created!",
-            description: "Welcome to Pulse Terminal. You're now logged in.",
+            description: "Welcome to Keystone Analytics. Check your email for a welcome message.",
           });
         }
       }
