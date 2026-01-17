@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { Loader2, TrendingUp, TrendingDown, Search, AlertCircle } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Search, AlertCircle, RefreshCw, Crosshair, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { StockSearch } from "@/components/dashboard/StockSearch";
@@ -15,6 +15,7 @@ import {
   defaultIndicators 
 } from "@/hooks/useChartData";
 import { useQuotes } from "@/hooks/useMarketData";
+import { motion } from "framer-motion";
 
 interface AdvancedChartProps {
   symbol?: string;
@@ -27,52 +28,43 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
   const [showSearch, setShowSearch] = useState(false);
   const [showCrosshair, setShowCrosshair] = useState(false);
 
-  // Fetch data
   const { candles, loading, error, refetch, timeframeConfig } = useChartData(symbol, timeframe);
   const { quotes } = useQuotes([symbol]);
   
-  // Get current quote
   const quote = quotes[0];
   const currentPrice = quote?.price || candles[candles.length - 1]?.close || 0;
   const priceChange = quote?.change || 0;
   const priceChangePercent = quote?.changePercent || 0;
   const isPositive = priceChange >= 0;
 
-  // Enrich candles with indicator data
   const enrichedData = useEnrichedChartData(candles, indicators);
 
-  // Toggle indicator
   const toggleIndicator = useCallback((id: string) => {
-    setIndicators(prev => prev.map(ind => 
-      ind.id === id ? { ...ind, enabled: !ind.enabled } : ind
-    ));
+    setIndicators(prev => prev.map(ind => ind.id === id ? { ...ind, enabled: !ind.enabled } : ind));
   }, []);
 
-  // Handle symbol selection
   const handleSymbolSelect = useCallback((newSymbol: string) => {
     onSymbolChange?.(newSymbol);
     setShowSearch(false);
   }, [onSymbolChange]);
 
-  // Check which oscillators are enabled
   const showRSI = indicators.find(i => i.id === "rsi")?.enabled;
   const showMACD = indicators.find(i => i.id === "macd")?.enabled;
 
-  // Calculate chart height dynamically
   const priceChartHeight = useMemo(() => {
-    let height = 340;
-    if (showRSI) height -= 50;
-    if (showMACD) height -= 60;
-    return Math.max(height, 200);
+    let height = 320;
+    if (showRSI) height -= 45;
+    if (showMACD) height -= 55;
+    return Math.max(height, 180);
   }, [showRSI, showMACD]);
 
   if (error) {
     return (
-      <div className="h-full flex flex-col items-center justify-center gap-4 p-8">
-        <AlertCircle className="w-12 h-12 text-destructive/50" />
-        <p className="text-muted-foreground text-sm text-center">Failed to load chart data</p>
-        <Button variant="outline" size="sm" onClick={refetch} className="gap-2">
-          <Loader2 className="w-4 h-4" /> Retry
+      <div className="h-full flex flex-col items-center justify-center gap-3 p-8">
+        <AlertCircle className="w-10 h-10 text-muted-foreground" />
+        <p className="text-xs text-muted-foreground">Failed to load chart</p>
+        <Button variant="outline" size="sm" onClick={refetch} className="gap-1.5 h-8 text-xs">
+          <RefreshCw className="w-3.5 h-3.5" /> Retry
         </Button>
       </div>
     );
@@ -80,71 +72,103 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3 px-1">
-        <div className="flex items-center gap-4">
+      {/* Header - Floating Symbol Chip */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
           {showSearch ? (
-            <div className="w-64">
-              <StockSearch 
-                onSelect={handleSymbolSelect}
-                placeholder="Search stocks..."
-                showInline
-              />
+            <div className="w-56">
+              <StockSearch onSelect={handleSymbolSelect} placeholder="Search..." showInline />
             </div>
           ) : (
-            <button
+            <motion.button
               onClick={() => setShowSearch(true)}
-              className="flex items-center gap-2 hover:bg-secondary/50 px-2 py-1 rounded-lg transition-colors group"
+              className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-accent/50 hover:bg-accent transition-colors group"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
-              <h2 className="text-xl font-bold font-mono flex items-center gap-2">
-                {symbol}
-                {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-              </h2>
-              <Search className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-            </button>
+              <span className="font-mono text-base font-bold text-foreground">{symbol}</span>
+              {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+              <Search className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+            </motion.button>
           )}
           
           {!showSearch && (
-            <div className="flex items-center gap-3">
-              <span className="text-2xl font-bold font-mono">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xl font-bold tabular-nums">
                 ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
-              <span
-                className={cn(
-                  "flex items-center gap-1 text-sm font-mono px-2 py-0.5 rounded-md",
-                  isPositive ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"
-                )}
-              >
+              <span className={cn(
+                "flex items-center gap-1 font-mono text-xs px-2 py-1 rounded-lg tabular-nums",
+                isPositive ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"
+              )}>
                 {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                {isPositive ? "+" : ""}
-                {priceChangePercent.toFixed(2)}%
+                {isPositive ? "+" : ""}{priceChangePercent.toFixed(2)}%
               </span>
             </div>
           )}
         </div>
+
+        {/* Mini Toolbar */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowCrosshair(!showCrosshair)}
+            className={cn(
+              "p-2 rounded-lg transition-colors",
+              showCrosshair ? "bg-primary/10 text-primary" : "hover:bg-accent text-muted-foreground"
+            )}
+          >
+            <Crosshair className="w-4 h-4" />
+          </button>
+          <button
+            onClick={refetch}
+            disabled={loading}
+            className="p-2 rounded-lg hover:bg-accent text-muted-foreground transition-colors"
+          >
+            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+          </button>
+        </div>
       </div>
 
-      {/* Toolbar */}
-      <ChartToolbar
-        timeframe={timeframe}
-        onTimeframeChange={setTimeframe}
-        indicators={indicators}
-        onToggleIndicator={toggleIndicator}
-        loading={loading}
-        onRefresh={refetch}
-        showCrosshair={showCrosshair}
-        onToggleCrosshair={() => setShowCrosshair(!showCrosshair)}
-      />
+      {/* Timeframe Pills */}
+      <div className="flex items-center gap-1 mb-3">
+        {(["1H", "4H", "1D", "1W", "1M"] as TimeframeType[]).map((tf) => (
+          <button
+            key={tf}
+            onClick={() => setTimeframe(tf)}
+            className={cn(
+              "px-3 py-1.5 text-[11px] font-mono font-medium rounded-lg transition-all",
+              timeframe === tf
+                ? "bg-primary text-primary-foreground"
+                : "bg-accent/50 hover:bg-accent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {tf}
+          </button>
+        ))}
+        
+        <div className="flex-1" />
+        
+        {/* Indicators button */}
+        <ChartToolbar
+          timeframe={timeframe}
+          onTimeframeChange={setTimeframe}
+          indicators={indicators}
+          onToggleIndicator={toggleIndicator}
+          loading={loading}
+          onRefresh={refetch}
+          showCrosshair={showCrosshair}
+          onToggleCrosshair={() => setShowCrosshair(!showCrosshair)}
+        />
+      </div>
 
       {/* Chart Area */}
-      <div className="flex-1 min-h-0 mt-2">
+      <div className="flex-1 min-h-0">
         {loading && enrichedData.length === 0 ? (
           <div className="h-full flex items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
         ) : (
           <div className="h-full flex flex-col gap-0">
-            {/* Main price chart */}
             <div className="flex-1 min-h-0">
               <PriceChart
                 data={enrichedData}
@@ -154,41 +178,30 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
                 height={priceChartHeight}
               />
             </div>
-
-            {/* Volume chart - tight coupling with price chart */}
-            <VolumeChart data={enrichedData} height={50} />
-
-            {/* RSI */}
-            {showRSI && <RSIChart data={enrichedData} height={80} />}
-
-            {/* MACD */}
-            {showMACD && <MACDChart data={enrichedData} height={100} />}
+            <VolumeChart data={enrichedData} height={44} />
+            {showRSI && <RSIChart data={enrichedData} height={70} />}
+            {showMACD && <MACDChart data={enrichedData} height={85} />}
           </div>
         )}
       </div>
 
-      {/* Price stats footer */}
+      {/* Footer Stats */}
       {quote && (
-        <div className="flex items-center gap-6 mt-3 pt-3 border-t border-border/50 text-xs font-mono px-1">
-          <div>
-            <span className="text-muted-foreground">High</span>
-            <span className="ml-2 text-gain">${quote.high.toFixed(2)}</span>
+        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/50 text-[10px] font-mono">
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground">H</span>
+            <span className="text-gain tabular-nums">${quote.high.toFixed(2)}</span>
           </div>
-          <div>
-            <span className="text-muted-foreground">Low</span>
-            <span className="ml-2 text-loss">${quote.low.toFixed(2)}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground">L</span>
+            <span className="text-loss tabular-nums">${quote.low.toFixed(2)}</span>
           </div>
-          <div>
-            <span className="text-muted-foreground">Open</span>
-            <span className="ml-2">${quote.open.toFixed(2)}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground">O</span>
+            <span className="tabular-nums">${quote.open.toFixed(2)}</span>
           </div>
-          <div>
-            <span className="text-muted-foreground">Prev Close</span>
-            <span className="ml-2">${quote.previousClose.toFixed(2)}</span>
-          </div>
-          <div className="ml-auto">
-            <span className="text-muted-foreground">Timeframe:</span>
-            <span className="ml-2 text-primary">{timeframeConfig.label}</span>
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="text-muted-foreground">{timeframeConfig.label}</span>
           </div>
         </div>
       )}
