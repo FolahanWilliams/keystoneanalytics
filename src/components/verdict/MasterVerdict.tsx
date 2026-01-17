@@ -18,6 +18,7 @@ import { Progress } from "@/components/ui/progress";
 import { VerdictGauge } from "./VerdictGauge";
 import { VerdictResult, VerdictMetric } from "@/utils/verdictEngine";
 import { useSubscription } from "@/hooks/useSubscription";
+import { FinancialDisclaimer } from "@/components/common/FinancialDisclaimer";
 import { cn } from "@/lib/utils";
 
 interface MasterVerdictProps {
@@ -307,6 +308,9 @@ export function MasterVerdict({ verdict, symbol, loading, onUnlockClick }: Maste
             </Button>
           </motion.div>
         )}
+
+        {/* Financial Disclaimer */}
+        <FinancialDisclaimer variant="compact" className="mt-4" />
       </CardContent>
     </Card>
   );
