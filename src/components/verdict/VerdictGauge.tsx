@@ -20,7 +20,7 @@ export function VerdictGauge({ score, size = 240, animated = true }: VerdictGaug
   const colors = getGaugeColor(clampedScore);
   
   const centerX = size / 2;
-  const centerY = size / 2 + 16;
+  const centerY = size / 2;
   const radius = size * 0.36;
   const strokeWidth = size * 0.05;
 
@@ -43,12 +43,30 @@ export function VerdictGauge({ score, size = 240, animated = true }: VerdictGaug
 
   const ticks = [0, 50, 100];
 
+  // Calculate label positions along the arc
+  const labelRadius = radius + strokeWidth / 2 + 16;
+  const sellAngle = -135;
+  const holdAngle = 0;
+  const buyAngle = 135;
+
+  const getLabelPos = (angle: number) => {
+    const rad = (angle * Math.PI) / 180;
+    return {
+      x: centerX + labelRadius * Math.cos(rad),
+      y: centerY + labelRadius * Math.sin(rad),
+    };
+  };
+
+  const sellPos = getLabelPos(sellAngle);
+  const holdPos = getLabelPos(holdAngle);
+  const buyPos = getLabelPos(buyAngle);
+
   return (
-    <div className="relative" style={{ width: size, height: size * 0.58 }}>
+    <div className="relative flex flex-col items-center" style={{ width: size, height: size * 0.75 }}>
       <svg 
         width={size} 
-        height={size * 0.65} 
-        viewBox={`0 0 ${size} ${size * 0.65}`}
+        height={size * 0.6} 
+        viewBox={`0 0 ${size} ${size * 0.6}`}
         className="overflow-visible"
       >
         <defs>
@@ -90,8 +108,7 @@ export function VerdictGauge({ score, size = 240, animated = true }: VerdictGaug
         {ticks.map((tick) => {
           const angle = -135 + (tick / 100) * 270;
           const rad = (angle * Math.PI) / 180;
-          const innerR = radius - strokeWidth / 2 - 6;
-          const labelR = radius - strokeWidth / 2 - 18;
+          const labelR = radius - strokeWidth / 2 - 16;
           
           return (
             <g key={tick}>
@@ -137,48 +154,63 @@ export function VerdictGauge({ score, size = 240, animated = true }: VerdictGaug
           />
         </motion.g>
 
-        {/* Labels */}
+        {/* SELL Label - left side */}
         <text
-          x={size * 0.12}
-          y={centerY + 28}
-          textAnchor="middle"
+          x={sellPos.x + 8}
+          y={sellPos.y + 4}
+          textAnchor="start"
           fill="hsl(350, 89%, 60%)"
-          fontSize={size * 0.035}
+          fontSize={size * 0.04}
           fontFamily="JetBrains Mono, monospace"
-          fontWeight="500"
+          fontWeight="600"
           letterSpacing="0.05em"
         >
           SELL
         </text>
+
+        {/* HOLD Label - center top */}
         <text
-          x={size * 0.88}
-          y={centerY + 28}
+          x={holdPos.x}
+          y={holdPos.y - 4}
           textAnchor="middle"
-          fill="hsl(160, 84%, 39%)"
-          fontSize={size * 0.035}
+          fill="hsl(38, 92%, 50%)"
+          fontSize={size * 0.04}
           fontFamily="JetBrains Mono, monospace"
-          fontWeight="500"
+          fontWeight="600"
+          letterSpacing="0.05em"
+        >
+          HOLD
+        </text>
+
+        {/* BUY Label - right side */}
+        <text
+          x={buyPos.x - 8}
+          y={buyPos.y + 4}
+          textAnchor="end"
+          fill="hsl(160, 84%, 39%)"
+          fontSize={size * 0.04}
+          fontFamily="JetBrains Mono, monospace"
+          fontWeight="600"
           letterSpacing="0.05em"
         >
           BUY
         </text>
       </svg>
 
-      {/* Score display */}
+      {/* Score display - centered below gauge */}
       <motion.div
-        className="absolute left-1/2 -translate-x-1/2 text-center"
-        style={{ bottom: -4 }}
+        className="flex flex-col items-center justify-center text-center mt-2"
         initial={animated ? { opacity: 0, y: 8 } : { opacity: 1, y: 0 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6, duration: 0.4 }}
       >
         <div 
-          className="font-mono text-4xl font-bold tabular-nums"
+          className="font-mono text-4xl font-bold tabular-nums leading-none"
           style={{ color: colors.main }}
         >
           {clampedScore}
         </div>
-        <div className="data-label mt-0.5">
+        <div className="data-label mt-1">
           Composite Score
         </div>
       </motion.div>

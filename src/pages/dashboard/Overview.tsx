@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import WatchlistWidget from "@/components/dashboard/WatchlistWidget";
 import NewsFeed from "@/components/dashboard/NewsFeed";
 import EconomicIndicators from "@/components/dashboard/EconomicIndicators";
-import { Activity, Zap, BarChart3, TrendingUp, LineChart, Brain, Globe, ArrowRight, DollarSign, Percent, Building } from "lucide-react";
+import { MarketStatusIndicator } from "@/components/dashboard/MarketStatusIndicator";
+import { Activity, Zap, BarChart3, TrendingUp, LineChart, Brain, Globe, ArrowRight, Percent, Building } from "lucide-react";
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
 import { useFredData } from "@/hooks/useFredData";
 
 const Overview = () => {
@@ -77,18 +76,19 @@ const Overview = () => {
     <div className="space-y-4">
       {/* Quick Stats Row */}
       <motion.div 
-        className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+        className="grid grid-cols-1 sm:grid-cols-4 gap-3"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       >
+        {/* Market Status */}
         <div className="bento-module p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
             <Activity className="w-5 h-5 text-primary" />
           </div>
-          <div>
-            <p className="data-label">Market Status</p>
-            <p className="text-sm font-semibold text-foreground">Bullish Trend</p>
+          <div className="flex-1 min-w-0">
+            <p className="data-label mb-0.5">Market Status</p>
+            <MarketStatusIndicator compact />
           </div>
         </div>
         
@@ -111,6 +111,16 @@ const Overview = () => {
             <p className="text-sm font-semibold text-foreground">
               65 <span className="text-muted-foreground font-normal text-xs">Greed</span>
             </p>
+          </div>
+        </div>
+
+        <div className="bento-module p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
+            <TrendingUp className="w-5 h-5 text-warning" />
+          </div>
+          <div>
+            <p className="data-label">S&P 500</p>
+            <p className="text-sm font-semibold font-mono text-gain tabular-nums">+0.42%</p>
           </div>
         </div>
       </motion.div>
