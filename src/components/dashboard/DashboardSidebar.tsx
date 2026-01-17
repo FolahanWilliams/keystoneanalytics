@@ -56,33 +56,41 @@ const NavigationContent = ({
 }) => (
   <>
     <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-terminal">
-      {navItems.map((item) => (
-        <NavLink
-          key={item.path}
-          to={item.path}
-          end={item.path === "/dashboard"}
-          onClick={onNavClick}
-          className={({ isActive }) =>
-            cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-              isActive
-                ? "bg-sidebar-accent text-primary"
-                : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              item.highlight && !isActive && "bg-primary/5 border border-primary/20 hover:border-primary/40"
-            )
-          }
-        >
-          <item.icon className={cn("w-5 h-5 flex-shrink-0", item.highlight && "text-primary")} />
-          {!collapsed && (
-            <span className={cn(item.highlight && "text-primary font-semibold")}>{item.label}</span>
-          )}
-          {item.highlight && !collapsed && (
-            <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-medium">
-              NEW
-            </span>
-          )}
-        </NavLink>
-      ))}
+      {navItems.map((item) => {
+        // Add data-onboarding attributes for tour highlights
+        const onboardingId = item.label === "AI Coach" ? "sidebar-coach" 
+          : item.label === "Analysis" ? "sidebar-analysis" 
+          : undefined;
+        
+        return (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            end={item.path === "/dashboard"}
+            onClick={onNavClick}
+            data-onboarding={onboardingId}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                isActive
+                  ? "bg-sidebar-accent text-primary"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                item.highlight && !isActive && "bg-primary/5 border border-primary/20 hover:border-primary/40"
+              )
+            }
+          >
+            <item.icon className={cn("w-5 h-5 flex-shrink-0", item.highlight && "text-primary")} />
+            {!collapsed && (
+              <span className={cn(item.highlight && "text-primary font-semibold")}>{item.label}</span>
+            )}
+            {item.highlight && !collapsed && (
+              <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-medium">
+                NEW
+              </span>
+            )}
+          </NavLink>
+        );
+      })}
     </nav>
 
     {/* Upgrade Banner (for free users) */}

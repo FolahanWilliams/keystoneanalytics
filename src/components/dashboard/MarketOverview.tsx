@@ -43,7 +43,7 @@ const MarketOverview = ({ onSymbolClick }: MarketOverviewProps) => {
   };
 
   return (
-    <div className="w-full border-b border-border/50 bg-card/30 backdrop-blur-sm">
+    <div data-onboarding="market-bar" className="w-full border-b border-border/50 bg-card/30 backdrop-blur-sm">
       <div className="flex items-center justify-between px-4 md:px-6 py-2.5">
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-terminal flex-1">
           {quotes.length > 0 ? (
