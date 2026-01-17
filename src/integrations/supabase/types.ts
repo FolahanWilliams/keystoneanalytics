@@ -74,6 +74,39 @@ export type Database = {
         }
         Relationships: []
       }
+      app_metrics: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          type: string
+          url: string | null
+          user_agent: string | null
+          user_id: string | null
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          type: string
+          url?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          value?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          type?: string
+          url?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { reportError } from '@/utils/monitoring';
 
 interface Props {
   children: ReactNode;
@@ -33,15 +34,8 @@ class ErrorBoundary extends Component<Props, State> {
     // Log error to console in development
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     
-    // In production, you could send this to an error tracking service
-    if (import.meta.env.PROD) {
-      // Future: Send to error tracking service
-      console.error('[Production Error]', {
-        error: error.message,
-        stack: error.stack,
-        componentStack: errorInfo.componentStack,
-      });
-    }
+    // Report error to monitoring service
+    reportError(error, errorInfo.componentStack || undefined);
   }
 
   handleReset = () => {
