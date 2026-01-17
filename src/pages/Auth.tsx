@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Activity, Mail, Lock, ArrowRight, Loader2, ArrowLeft } from "lucide-react";
+import { Mail, Lock, ArrowRight, Loader2, ArrowLeft, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { motion } from "framer-motion";
 
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -67,22 +68,15 @@ const Auth = () => {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!validateEmail()) return;
-    
     setLoading(true);
 
     try {
       const response = await supabase.functions.invoke("send-password-reset", {
-        body: {
-          email,
-          redirectTo: `${window.location.origin}/auth`,
-        },
+        body: { email, redirectTo: `${window.location.origin}/auth` },
       });
 
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
+      if (response.error) throw new Error(response.error.message);
 
       toast({
         title: "Check Your Email",
@@ -104,40 +98,27 @@ const Auth = () => {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!validateForm()) return;
-    
     setLoading(true);
 
     try {
       if (mode === "login") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
 
         if (error) {
-          if (error.message.includes("Invalid login credentials")) {
-            toast({
-              title: "Login Failed",
-              description: "Invalid email or password. Please try again.",
-              variant: "destructive",
-            });
-          } else {
-            toast({
-              title: "Error",
-              description: error.message,
-              variant: "destructive",
-            });
-          }
+          toast({
+            title: "Login Failed",
+            description: error.message.includes("Invalid login credentials") 
+              ? "Invalid email or password. Please try again."
+              : error.message,
+            variant: "destructive",
+          });
         }
       } else {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
-          },
+          options: { emailRedirectTo: `${window.location.origin}/dashboard` },
         });
 
         if (error) {
@@ -149,11 +130,7 @@ const Auth = () => {
             });
             setMode("login");
           } else {
-            toast({
-              title: "Error",
-              description: error.message,
-              variant: "destructive",
-            });
+            toast({ title: "Error", description: error.message, variant: "destructive" });
           }
         } else {
           toast({
@@ -173,170 +150,127 @@ const Auth = () => {
     }
   };
 
-  const renderForgotPassword = () => (
-    <form onSubmit={handleForgotPassword} className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <div className="relative">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            id="email"
-            type="email"
-            placeholder="trader@example.com"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setErrors((prev) => ({ ...prev, email: undefined }));
-            }}
-            className="pl-10 bg-secondary/50 border-border focus:border-primary"
-          />
-        </div>
-        {errors.email && (
-          <p className="text-sm text-destructive">{errors.email}</p>
-        )}
-      </div>
-
-      <Button
-        type="submit"
-        className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-12 gap-2"
-        disabled={loading}
-      >
-        {loading ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <>
-            Send Reset Link
-            <ArrowRight className="w-4 h-4" />
-          </>
-        )}
-      </Button>
-
-      <button
-        type="button"
-        onClick={() => setMode("login")}
-        className="flex items-center justify-center gap-2 w-full text-sm text-muted-foreground hover:text-primary transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Back to Sign In
-      </button>
-    </form>
-  );
-
-  const renderAuthForm = () => (
-    <form onSubmit={handleAuth} className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <div className="relative">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            id="email"
-            type="email"
-            placeholder="trader@example.com"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setErrors((prev) => ({ ...prev, email: undefined }));
-            }}
-            className="pl-10 bg-secondary/50 border-border focus:border-primary"
-          />
-        </div>
-        {errors.email && (
-          <p className="text-sm text-destructive">{errors.email}</p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <div className="relative">
-          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            id="password"
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setErrors((prev) => ({ ...prev, password: undefined }));
-            }}
-            className="pl-10 bg-secondary/50 border-border focus:border-primary"
-          />
-        </div>
-        {errors.password && (
-          <p className="text-sm text-destructive">{errors.password}</p>
-        )}
-      </div>
-
-      {mode === "login" && (
-        <button
-          type="button"
-          onClick={() => setMode("forgot-password")}
-          className="text-sm text-primary hover:text-primary/80 transition-colors"
-        >
-          Forgot your password?
-        </button>
-      )}
-
-      <Button
-        type="submit"
-        className="w-full bg-primary text-primary-foreground hover:bg-primary/90 h-12 gap-2"
-        disabled={loading}
-      >
-        {loading ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <>
-            {mode === "login" ? "Sign In" : "Create Account"}
-            <ArrowRight className="w-4 h-4" />
-          </>
-        )}
-      </Button>
-    </form>
-  );
-
   const getTitle = () => {
     switch (mode) {
-      case "forgot-password":
-        return "Reset Password";
-      case "signup":
-        return "Create Account";
-      default:
-        return "Welcome Back";
+      case "forgot-password": return "Reset Password";
+      case "signup": return "Create Account";
+      default: return "Welcome Back";
     }
   };
 
   const getSubtitle = () => {
     switch (mode) {
-      case "forgot-password":
-        return "Enter your email to receive a password reset link";
-      case "signup":
-        return "Get started with Pulse Terminal";
-      default:
-        return "Sign in to access your trading terminal";
+      case "forgot-password": return "Enter your email to receive a reset link";
+      case "signup": return "Get started with Pulse Terminal";
+      default: return "Sign in to access your terminal";
     }
   };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Background effects */}
-      <div className="absolute inset-0 grid-pattern opacity-20" />
+      {/* Background */}
+      <div className="absolute inset-0 grid-pattern opacity-15" />
       <div className="absolute inset-0 hero-gradient" />
-      <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+      <div className="absolute top-1/3 left-1/3 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px]" />
 
-      <div className="relative z-10 w-full max-w-md">
+      <motion.div 
+        className="relative z-10 w-full max-w-md"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      >
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <Activity className="w-10 h-10 text-primary" />
+        <Link to="/" className="flex items-center justify-center gap-2.5 mb-8 hover:opacity-80 transition-opacity">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <TrendingUp className="w-5 h-5 text-primary" />
+          </div>
           <span className="text-2xl font-bold tracking-tight">Pulse Terminal</span>
-        </div>
+        </Link>
 
         {/* Auth Card */}
-        <div className="glass-panel rounded-2xl p-8">
+        <div className="bento-module p-8">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold">{getTitle()}</h1>
-            <p className="text-muted-foreground mt-2">{getSubtitle()}</p>
+            <h1 className="text-2xl font-bold" style={{ letterSpacing: "-0.02em" }}>{getTitle()}</h1>
+            <p className="text-muted-foreground mt-2 text-sm">{getSubtitle()}</p>
           </div>
 
-          {mode === "forgot-password" ? renderForgotPassword() : renderAuthForm()}
+          <form onSubmit={mode === "forgot-password" ? handleForgotPassword : handleAuth} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="trader@example.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setErrors((prev) => ({ ...prev, email: undefined }));
+                  }}
+                  className="pl-10 h-11 bg-accent/30 border-border focus:border-primary"
+                />
+              </div>
+              {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+            </div>
+
+            {mode !== "forgot-password" && (
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setErrors((prev) => ({ ...prev, password: undefined }));
+                    }}
+                    className="pl-10 h-11 bg-accent/30 border-border focus:border-primary"
+                  />
+                </div>
+                {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
+              </div>
+            )}
+
+            {mode === "login" && (
+              <button
+                type="button"
+                onClick={() => setMode("forgot-password")}
+                className="text-xs text-primary hover:text-primary/80 transition-colors"
+              >
+                Forgot your password?
+              </button>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full h-11 bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  {mode === "forgot-password" ? "Send Reset Link" : mode === "login" ? "Sign In" : "Create Account"}
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </Button>
+
+            {mode === "forgot-password" && (
+              <button
+                type="button"
+                onClick={() => setMode("login")}
+                className="flex items-center justify-center gap-2 w-full text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Sign In
+              </button>
+            )}
+          </form>
 
           {mode !== "forgot-password" && (
             <div className="mt-6 text-center">
@@ -345,18 +279,18 @@ const Auth = () => {
                 onClick={() => setMode(mode === "login" ? "signup" : "login")}
                 className="text-sm text-muted-foreground hover:text-primary transition-colors"
               >
-                {mode === "login"
-                  ? "Don't have an account? Sign up"
-                  : "Already have an account? Sign in"}
+                {mode === "login" ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
               </button>
             </div>
           )}
         </div>
 
-        <p className="mt-8 text-center text-sm text-muted-foreground">
-          By continuing, you agree to our Terms of Service and Privacy Policy.
+        <p className="mt-8 text-center text-xs text-muted-foreground">
+          By continuing, you agree to our{" "}
+          <Link to="/terms" className="text-primary hover:underline">Terms</Link> and{" "}
+          <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
         </p>
-      </div>
+      </motion.div>
     </div>
   );
 };
