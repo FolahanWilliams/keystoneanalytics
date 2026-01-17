@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Activity, BarChart3, Gauge, Target, AlertTriangle, RefreshCw } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { TrendingUp, TrendingDown, Activity, BarChart3, Gauge, Target, AlertTriangle, RefreshCw, Database, Clock, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -256,6 +256,32 @@ export function MarketDataPanel({ symbol, onSymbolChange }: MarketDataPanelProps
               <span className="text-xs text-muted-foreground">
                 {candles.length} trading days
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* Data Quality / Debug Row */}
+        {candles && candles.length > 0 && (
+          <div className="p-2 rounded bg-muted/30 border border-border/30 text-[10px] text-muted-foreground">
+            <div className="flex items-center gap-1 mb-1">
+              <Database className="w-3 h-3" />
+              <span className="font-medium">Data Quality</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              <div className="flex items-center gap-1">
+                <Clock className="w-2.5 h-2.5" />
+                <span>
+                  {new Date(candles[candles.length - 1].timestamp * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <BarChart3 className="w-2.5 h-2.5" />
+                <span>{candles.length} bars</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Info className="w-2.5 h-2.5" />
+                <span>Daily</span>
+              </div>
             </div>
           </div>
         )}
