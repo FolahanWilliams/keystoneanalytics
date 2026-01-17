@@ -101,24 +101,25 @@ interface BentoGridProps {
   stagger?: boolean;
 }
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
 export const BentoGrid = React.forwardRef<HTMLDivElement, BentoGridProps>(
   ({ className, children, stagger = true }, ref) => {
     return (
-      <motion.div
+      <div
         ref={ref}
         className={cn("bento-grid", className)}
-        initial="hidden"
-        animate="visible"
-        variants={stagger ? {
-          visible: {
-            transition: {
-              staggerChildren: 0.1
-            }
-          }
-        } : undefined}
       >
         {children}
-      </motion.div>
+      </div>
     );
   }
 );
