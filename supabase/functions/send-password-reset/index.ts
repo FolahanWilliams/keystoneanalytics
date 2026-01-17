@@ -53,7 +53,18 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const resetLink = data.properties?.action_link;
+    // The action_link is in data.properties.action_link
+    const resetLink = data?.properties?.action_link;
+    
+    console.log("Generated reset link data:", JSON.stringify(data, null, 2));
+    
+    if (!resetLink) {
+      console.error("No action_link in response. Full data:", data);
+      return new Response(
+        JSON.stringify({ success: true, message: "If an account exists, a reset email has been sent." }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
     // Send email via Resend
     const emailResponse = await resend.emails.send({
