@@ -1,7 +1,7 @@
+import { memo, useState, useEffect, useRef, useMemo } from "react";
 import { TrendingUp, TrendingDown, Clock, RefreshCw, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuotes } from "@/hooks/useMarketData";
-import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
@@ -11,12 +11,14 @@ interface MarketOverviewProps {
   onSymbolClick?: (symbol: string) => void;
 }
 
-const MarketOverview = ({ onSymbolClick }: MarketOverviewProps) => {
+const MarketOverviewComponent = ({ onSymbolClick }: MarketOverviewProps) => {
   const { quotes, loading, refetch } = useQuotes(MARKET_SYMBOLS);
   const [displayTime, setDisplayTime] = useState(() => new Date());
   const navigate = useNavigate();
   const lastMinuteRef = useRef(displayTime.getMinutes());
 
+  // Optimized: Check every 10 seconds instead of every second
+  // Only update state when minute changes
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
@@ -24,14 +26,18 @@ const MarketOverview = ({ onSymbolClick }: MarketOverviewProps) => {
         lastMinuteRef.current = now.getMinutes();
         setDisplayTime(now);
       }
-    }, 1000);
+    }, 10000); // Check every 10 seconds instead of 1 second
     return () => clearInterval(interval);
   }, []);
 
-  const hours = displayTime.getUTCHours() - 5;
-  const day = displayTime.getUTCDay();
-  const isWeekend = day === 0 || day === 6;
-  const isMarketHours = !isWeekend && hours >= 9.5 && hours < 16;
+  // Memoize market status calculation
+  const { isMarketHours, isWeekend } = useMemo(() => {
+    const hours = displayTime.getUTCHours() - 5;
+    const day = displayTime.getUTCDay();
+    const weekend = day === 0 || day === 6;
+    const marketHours = !weekend && hours >= 9.5 && hours < 16;
+    return { isMarketHours: marketHours, isWeekend: weekend };
+  }, [displayTime]);
 
   const handleSymbolClick = (symbol: string) => {
     if (onSymbolClick) {
@@ -138,5 +144,8 @@ const MarketOverview = ({ onSymbolClick }: MarketOverviewProps) => {
     </div>
   );
 };
+
+// Memoize the entire component
+const MarketOverview = memo(MarketOverviewComponent);
 
 export default MarketOverview;

@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo, useCallback } from "react";
 import { Search, X, Loader2, TrendingUp, Building2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useSymbolSearch, SearchResult } from "@/hooks/useMarketData";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 interface StockSearchProps {
   onSelect: (symbol: string, name: string) => void;
@@ -11,7 +12,7 @@ interface StockSearchProps {
   showInline?: boolean;
 }
 
-export function StockSearch({ 
+function StockSearchComponent({ 
   onSelect, 
   placeholder = "Search any stock...", 
   className,
@@ -23,19 +24,18 @@ export function StockSearch({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Debounced search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (query.length >= 1) {
-        search(query);
-        setIsOpen(true);
-      } else {
-        setIsOpen(false);
-      }
-    }, 300);
+  // Use debounced value hook for cleaner debouncing
+  const debouncedQuery = useDebouncedValue(query, 300);
 
-    return () => clearTimeout(timer);
-  }, [query, search]);
+  // Search when debounced query changes
+  useEffect(() => {
+    if (debouncedQuery.length >= 1) {
+      search(debouncedQuery);
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  }, [debouncedQuery, search]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -49,17 +49,17 @@ export function StockSearch({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelect = (result: SearchResult) => {
+  const handleSelect = useCallback((result: SearchResult) => {
     onSelect(result.symbol, result.name);
     setQuery("");
     setIsOpen(false);
-  };
+  }, [onSelect]);
 
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
     setQuery("");
     setIsOpen(false);
     inputRef.current?.focus();
-  };
+  }, []);
 
   const getTypeIcon = (type: string) => {
     switch (type?.toLowerCase()) {
@@ -144,3 +144,6 @@ export function StockSearch({
     </div>
   );
 }
+
+// Memoize component to prevent unnecessary re-renders
+export const StockSearch = memo(StockSearchComponent);
