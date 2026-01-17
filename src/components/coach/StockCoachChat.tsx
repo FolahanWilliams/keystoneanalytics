@@ -110,11 +110,27 @@ export function StockCoachChat({ initialSymbol, onSymbolMentioned }: StockCoachC
     }
   }, [initialSymbol]);
 
+  // Extract stock symbols from user message
+  const extractSymbols = (message: string): string[] => {
+    const symbolPattern = /\b([A-Z]{1,5})\b/g;
+    const matches = message.match(symbolPattern) || [];
+    const commonWords = new Set(['I', 'A', 'THE', 'AND', 'OR', 'FOR', 'TO', 'IN', 'IS', 'IT', 'BE', 'AS', 'AT', 'SO', 'WE', 'HE', 'BY', 'ON', 'DO', 'IF', 'ME', 'MY', 'UP', 'AN', 'GO', 'NO', 'US', 'AM', 'OF', 'AI', 'RSI', 'EMA', 'SMA', 'ATR', 'MACD', 'PE', 'EPS', 'CEO', 'CFO', 'IPO', 'ETF', 'GDP', 'CPI', 'FED', 'SEC', 'NYSE', 'DOW', 'USD', 'EUR', 'GBP', 'BUY', 'SELL', 'HOLD', 'STOP', 'LOSS', 'WHAT', 'WHEN', 'WHERE', 'WHY', 'HOW', 'CAN', 'ARE', 'WAS', 'HAS', 'HAD', 'WILL', 'THIS', 'THAT', 'ABOUT', 'YOUR', 'GIVE', 'NOW', 'SET']);
+    return matches.filter(s => s.length >= 2 && !commonWords.has(s));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
     
-    sendMessage(input);
+    // Extract symbols from the input and update the side panel
+    const detectedSymbols = extractSymbols(input);
+    if (detectedSymbols.length > 0) {
+      onSymbolMentioned?.(detectedSymbols[0]);
+      sendMessage(input, detectedSymbols);
+    } else {
+      sendMessage(input);
+    }
+    
     setInput("");
     
     // Reset textarea height

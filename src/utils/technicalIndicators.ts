@@ -62,40 +62,46 @@ export function calculateBollingerBands(
 
 export function calculateRSI(data: number[], period: number = 14): (number | null)[] {
   const result: (number | null)[] = [];
-  const gains: number[] = [];
-  const losses: number[] = [];
 
-  for (let i = 0; i < data.length; i++) {
-    if (i === 0) {
-      result.push(null);
-      continue;
-    }
+  if (data.length < period + 1) {
+    return data.map(() => null);
+  }
 
+  // Calculate initial average gain and loss
+  let avgGain = 0;
+  let avgLoss = 0;
+
+  for (let i = 1; i <= period; i++) {
     const change = data[i] - data[i - 1];
-    gains.push(change > 0 ? change : 0);
-    losses.push(change < 0 ? Math.abs(change) : 0);
+    if (change > 0) avgGain += change;
+    else avgLoss += Math.abs(change);
+  }
 
-    if (i < period) {
-      result.push(null);
-    } else if (i === period) {
-      const avgGain = gains.slice(0, period).reduce((sum, val) => sum + val, 0) / period;
-      const avgLoss = losses.slice(0, period).reduce((sum, val) => sum + val, 0) / period;
-      const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-      result.push(100 - 100 / (1 + rs));
+  avgGain /= period;
+  avgLoss /= period;
+
+  // Fill nulls for the warm-up period
+  for (let i = 0; i < period; i++) {
+    result.push(null);
+  }
+
+  // Calculate first RSI value
+  const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  result.push(100 - 100 / (1 + rs));
+
+  // Apply Wilder's smoothing for the rest of the data
+  for (let i = period + 1; i < data.length; i++) {
+    const change = data[i] - data[i - 1];
+    const currentGain = change > 0 ? change : 0;
+    const currentLoss = change < 0 ? Math.abs(change) : 0;
+
+    avgGain = (avgGain * (period - 1) + currentGain) / period;
+    avgLoss = (avgLoss * (period - 1) + currentLoss) / period;
+
+    if (avgLoss === 0) {
+      result.push(100);
     } else {
-      const prevRsi = result[i - 1];
-      if (prevRsi === null) {
-        result.push(null);
-        continue;
-      }
-
-      const prevAvgGain = gains.slice(-period - 1, -1).reduce((sum, val) => sum + val, 0) / period;
-      const prevAvgLoss = losses.slice(-period - 1, -1).reduce((sum, val) => sum + val, 0) / period;
-
-      const avgGain = (prevAvgGain * (period - 1) + gains[gains.length - 1]) / period;
-      const avgLoss = (prevAvgLoss * (period - 1) + losses[losses.length - 1]) / period;
-
-      const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+      const rs = avgGain / avgLoss;
       result.push(100 - 100 / (1 + rs));
     }
   }

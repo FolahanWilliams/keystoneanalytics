@@ -38,6 +38,7 @@ const Coach = () => {
 
   const handleSymbolMentioned = (symbol: string) => {
     setActiveSymbol(symbol);
+    setSearchParams({ symbol });
   };
 
   return (
