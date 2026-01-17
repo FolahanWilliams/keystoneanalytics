@@ -60,7 +60,7 @@ const Overview = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Main Chart Area */}
         <div className="lg:col-span-8">
-          <div className="glass-panel rounded-xl p-4 min-h-[540px]">
+          <div data-onboarding="chart" className="glass-panel rounded-xl p-4 min-h-[540px]">
             <AdvancedChart symbol={selectedSymbol} onSymbolChange={setSelectedSymbol} />
           </div>
         </div>
@@ -68,7 +68,7 @@ const Overview = () => {
         {/* Sidebar Widgets */}
         <div className="lg:col-span-4 flex flex-col gap-4">
           {/* Watchlist */}
-          <div className="glass-panel rounded-xl p-4 h-[280px]">
+          <div data-onboarding="watchlist" className="glass-panel rounded-xl p-4 h-[280px]">
             <WatchlistWidget 
               onSelectSymbol={setSelectedSymbol} 
               selectedSymbol={selectedSymbol}

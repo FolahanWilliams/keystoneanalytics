@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings as SettingsIcon, User, Bell, Shield, Palette, Loader2, CreditCard, Crown, ExternalLink, RefreshCw } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Shield, Palette, Loader2, CreditCard, Crown, ExternalLink, RefreshCw, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,7 @@ const Settings = () => {
     syncSubscription,
     isSyncing 
   } = useSubscription();
+  const { resetOnboarding } = useOnboarding();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -293,12 +295,30 @@ const Settings = () => {
           <h2 className="font-semibold">Appearance</h2>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <Label className="font-medium">Dark Mode</Label>
-            <p className="text-sm text-muted-foreground">Use dark theme across the application</p>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="font-medium">Dark Mode</Label>
+              <p className="text-sm text-muted-foreground">Use dark theme across the application</p>
+            </div>
+            <Switch defaultChecked />
           </div>
-          <Switch defaultChecked />
+
+          <div className="flex items-center justify-between pt-4 border-t border-border/50">
+            <div>
+              <Label className="font-medium">Replay Onboarding Tour</Label>
+              <p className="text-sm text-muted-foreground">Watch the welcome tutorial again</p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => resetOnboarding()}
+              className="gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Replay
+            </Button>
+          </div>
         </div>
       </div>
 

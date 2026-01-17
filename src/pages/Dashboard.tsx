@@ -4,6 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session } from "@supabase/supabase-js";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import MarketOverview from "@/components/dashboard/MarketOverview";
+import { WelcomeModal, OnboardingTour } from "@/components/onboarding";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { Loader2 } from "lucide-react";
 
 const Dashboard = () => {
@@ -15,6 +17,20 @@ const Dashboard = () => {
 
   // Get symbol from URL if present (used when navigating from watchlist)
   const urlSymbol = searchParams.get("symbol");
+
+  // Onboarding state
+  const {
+    isLoading: onboardingLoading,
+    showWelcomeModal,
+    showTour,
+    currentStep,
+    totalSteps,
+    currentStepData,
+    startTour,
+    nextStep,
+    prevStep,
+    skipTour,
+  } = useOnboarding();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -60,6 +76,28 @@ const Dashboard = () => {
           <Outlet context={{ urlSymbol }} />
         </main>
       </div>
+
+      {/* Onboarding Components */}
+      {!onboardingLoading && (
+        <>
+          <WelcomeModal
+            isOpen={showWelcomeModal}
+            onStartTour={startTour}
+            onSkip={skipTour}
+          />
+          {currentStepData && (
+            <OnboardingTour
+              isActive={showTour}
+              currentStep={currentStep}
+              totalSteps={totalSteps}
+              stepData={currentStepData}
+              onNext={nextStep}
+              onPrev={prevStep}
+              onSkip={skipTour}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 };
