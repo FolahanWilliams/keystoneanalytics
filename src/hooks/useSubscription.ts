@@ -65,21 +65,20 @@ export function useSubscription() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
-      // Use the safe view that excludes sensitive Stripe fields
-      const { data, error } = await supabase
-        .from("user_subscriptions_safe")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
+      // Use the security definer function that excludes sensitive Stripe fields
+      const { data, error } = await supabase.rpc("get_user_subscription");
 
       if (error) {
-        if (error.code === "PGRST116") {
-          return { tier: "free" as SubscriptionTier } as Subscription;
-        }
-        throw error;
+        console.error("Subscription fetch error:", error);
+        return { tier: "free" as SubscriptionTier } as Subscription;
       }
 
-      return data as Subscription;
+      // Function returns an array, get first item or default to free
+      if (!data || data.length === 0) {
+        return { tier: "free" as SubscriptionTier } as Subscription;
+      }
+
+      return data[0] as Subscription;
     },
     staleTime: 1000 * 60 * 5,
   });
