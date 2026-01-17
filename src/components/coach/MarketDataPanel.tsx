@@ -44,11 +44,76 @@ function calculateRSI(closes: number[], period = 14): number {
   return 100 - 100 / (1 + rs);
 }
 
-// Calculate SMA
+// Calculate SMA - uses MOST RECENT n days (slice from end)
 function calculateSMA(data: number[], period: number): number {
   if (data.length < period) return data.reduce((a, b) => a + b, 0) / data.length;
+  // Use most recent 'period' days from the END of the array
   return data.slice(-period).reduce((a, b) => a + b, 0) / period;
 }
+
+// Calculate pivot points (Standard) for support/resistance
+function calculatePivotLevels(highs: number[], lows: number[], closes: number[], lookback: number = 60) {
+  const recentHighs = highs.slice(-lookback);
+  const recentLows = lows.slice(-lookback);
+  const recentCloses = closes.slice(-lookback);
+  
+  // Find swing highs and lows (local peaks/troughs)
+  const swingHighs: number[] = [];
+  const swingLows: number[] = [];
+  
+  for (let i = 2; i < recentHighs.length - 2; i++) {
+    // Swing high: higher than 2 bars on each side
+    if (recentHighs[i] > recentHighs[i - 1] && recentHighs[i] > recentHighs[i - 2] &&
+        recentHighs[i] > recentHighs[i + 1] && recentHighs[i] > recentHighs[i + 2]) {
+      swingHighs.push(recentHighs[i]);
+    }
+    // Swing low: lower than 2 bars on each side
+    if (recentLows[i] < recentLows[i - 1] && recentLows[i] < recentLows[i - 2] &&
+        recentLows[i] < recentLows[i + 1] && recentLows[i] < recentLows[i + 2]) {
+      swingLows.push(recentLows[i]);
+    }
+  }
+  
+  const currentPrice = recentCloses[recentCloses.length - 1];
+  
+  // Find nearest resistance (swing high above current price)
+  const resistanceLevels = swingHighs.filter(h => h > currentPrice).sort((a, b) => a - b);
+  // Find nearest support (swing low below current price)
+  const supportLevels = swingLows.filter(l => l < currentPrice).sort((a, b) => b - a);
+  
+  // Fallback to period high/low if no swing points found
+  const resistance = resistanceLevels[0] || Math.max(...recentHighs);
+  const support = supportLevels[0] || Math.min(...recentLows);
+  
+  return { support, resistance };
+}
+
+// Calculate 30-day performance using correct date comparison
+function calculate30DayPerformance(candles: { close: number; timestamp: number }[]): number | null {
+  if (candles.length < 2) return null;
+  
+  const currentPrice = candles[candles.length - 1].close;
+  const currentTimestamp = candles[candles.length - 1].timestamp;
+  const thirtyDaysAgo = currentTimestamp - (30 * 24 * 60 * 60);
+  
+  // Find the candle closest to 30 days ago
+  let closestCandle = candles[0];
+  let closestDiff = Math.abs(candles[0].timestamp - thirtyDaysAgo);
+  
+  for (const candle of candles) {
+    const diff = Math.abs(candle.timestamp - thirtyDaysAgo);
+    if (diff < closestDiff) {
+      closestDiff = diff;
+      closestCandle = candle;
+    }
+  }
+  
+  if (closestCandle.close === 0) return null;
+  return ((currentPrice - closestCandle.close) / closestCandle.close) * 100;
+}
+
+// Minimum data points required for reliable calculations
+const MIN_DATA_POINTS = 50;
 
 export function MarketDataPanel({ symbol, onSymbolChange }: MarketDataPanelProps) {
   const { quotes, loading: quotesLoading, refetch: refetchQuotes } = useQuotes([symbol]);
@@ -56,29 +121,45 @@ export function MarketDataPanel({ symbol, onSymbolChange }: MarketDataPanelProps
   
   const quote = quotes[0];
   const isLoading = quotesLoading || candlesLoading;
+  
+  // Check for insufficient data
+  const hasInsufficientData = !candlesLoading && candles && candles.length < MIN_DATA_POINTS;
 
-  // Calculate technicals from candles
-  const technicals = candles && candles.length >= 20 ? (() => {
+  // Calculate technicals from candles - require at least MIN_DATA_POINTS
+  const technicals = candles && candles.length >= MIN_DATA_POINTS ? (() => {
     const closes = candles.map(c => c.close);
     const highs = candles.map(c => c.high);
     const lows = candles.map(c => c.low);
     
+    // Calculate SMAs using most recent data
     const sma20 = calculateSMA(closes, 20);
-    const sma50 = calculateSMA(closes, Math.min(50, closes.length));
+    const sma50 = closes.length >= 50 ? calculateSMA(closes, 50) : null;
     const rsi = calculateRSI(closes);
     
+    // Calculate proper pivot-based support/resistance
+    const { support, resistance } = calculatePivotLevels(highs, lows, closes, Math.min(60, closes.length));
+    
     const currentPrice = closes[closes.length - 1];
-    const support = Math.min(...lows.slice(-10));
-    const resistance = Math.max(...highs.slice(-10));
     
     let trend = "Neutral";
-    if (currentPrice > sma20 && sma20 > sma50) trend = "Bullish";
-    else if (currentPrice < sma20 && sma20 < sma50) trend = "Bearish";
-    else if (currentPrice > sma20) trend = "Mildly Bullish";
-    else if (currentPrice < sma20) trend = "Mildly Bearish";
+    if (sma50 !== null) {
+      if (currentPrice > sma20 && sma20 > sma50) trend = "Bullish";
+      else if (currentPrice < sma20 && sma20 < sma50) trend = "Bearish";
+      else if (currentPrice > sma20) trend = "Mildly Bullish";
+      else if (currentPrice < sma20) trend = "Mildly Bearish";
+    } else {
+      // Without SMA50, just compare to SMA20
+      if (currentPrice > sma20 * 1.02) trend = "Mildly Bullish";
+      else if (currentPrice < sma20 * 0.98) trend = "Mildly Bearish";
+    }
     
     return { sma20, sma50, rsi, support, resistance, trend };
   })() : null;
+  
+  // Calculate 30-day performance separately
+  const performance30d = candles && candles.length >= 20 
+    ? calculate30DayPerformance(candles) 
+    : null;
 
   const handleRefresh = () => {
     refetchQuotes();
@@ -172,7 +253,9 @@ export function MarketDataPanel({ symbol, onSymbolChange }: MarketDataPanelProps
                 </div>
                 <div>
                   <span className="text-muted-foreground">SMA(50)</span>
-                  <p className="font-mono font-medium">${technicals.sma50.toFixed(2)}</p>
+                  <p className="font-mono font-medium">
+                    {technicals.sma50 !== null ? `$${technicals.sma50.toFixed(2)}` : 'N/A'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -226,6 +309,17 @@ export function MarketDataPanel({ symbol, onSymbolChange }: MarketDataPanelProps
               </div>
             </div>
           </>
+        ) : hasInsufficientData ? (
+          <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 text-center">
+            <BarChart3 className="w-8 h-8 mx-auto mb-2 text-amber-500" />
+            <p className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+              Insufficient History
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Need {MIN_DATA_POINTS}+ data points for reliable analysis. 
+              Currently have {candles?.length || 0}.
+            </p>
+          </div>
         ) : (
           <div className="p-4 rounded-lg bg-secondary/20 border border-border/50 text-center">
             <BarChart3 className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
@@ -236,25 +330,18 @@ export function MarketDataPanel({ symbol, onSymbolChange }: MarketDataPanelProps
         )}
 
         {/* Quick Stats */}
-        {candles && candles.length > 0 && (
+        {candles && candles.length > 0 && performance30d !== null && (
           <div className="pt-2 border-t border-border/50">
             <p className="text-xs text-muted-foreground mb-2">30-Day Performance</p>
             <div className="flex gap-2">
-              {(() => {
-                const firstClose = candles[0]?.close || 0;
-                const lastClose = candles[candles.length - 1]?.close || 0;
-                const change = ((lastClose - firstClose) / firstClose * 100);
-                return (
-                  <Badge 
-                    variant={change >= 0 ? "default" : "destructive"}
-                    className="font-mono"
-                  >
-                    {change >= 0 ? "+" : ""}{change.toFixed(2)}%
-                  </Badge>
-                );
-              })()}
+              <Badge 
+                variant={performance30d >= 0 ? "default" : "destructive"}
+                className="font-mono"
+              >
+                {performance30d >= 0 ? "+" : ""}{performance30d.toFixed(2)}%
+              </Badge>
               <span className="text-xs text-muted-foreground">
-                {candles.length} trading days
+                {candles.length} trading days available
               </span>
             </div>
           </div>

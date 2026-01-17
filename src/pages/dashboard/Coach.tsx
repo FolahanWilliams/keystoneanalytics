@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { StockCoachChat } from "@/components/coach/StockCoachChat";
 import { MarketDataPanel } from "@/components/coach/MarketDataPanel";
+import { MasterVerdict } from "@/components/verdict/MasterVerdict";
 import { StockSearch } from "@/components/dashboard/StockSearch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Brain, Lightbulb, ShieldCheck, Target, TrendingUp, BookOpen, Search } from "lucide-react";
+import { useVerdict } from "@/hooks/useVerdict";
 
 const FEATURED_STOCKS = [
   { symbol: "AAPL", name: "Apple Inc." },
@@ -29,6 +31,9 @@ const Coach = () => {
   const initialSymbol = searchParams.get("symbol") || "";
   const [activeSymbol, setActiveSymbol] = useState(initialSymbol || "AAPL");
   const [showSearch, setShowSearch] = useState(false);
+  
+  // Get verdict data for the active symbol
+  const { verdict, loading: verdictLoading } = useVerdict({ symbol: activeSymbol });
 
   const handleSymbolSelect = (symbol: string) => {
     setActiveSymbol(symbol);
@@ -109,8 +114,18 @@ const Coach = () => {
           />
         </div>
 
-        {/* Market Data Panel - Takes 1 column */}
-        <div className="h-[600px] overflow-auto">
+        {/* Right Sidebar - Market Data + Verdict */}
+        <div className="space-y-4 h-[600px] overflow-auto">
+          {/* Master Verdict */}
+          {verdict && (
+            <MasterVerdict 
+              verdict={verdict}
+              symbol={activeSymbol}
+              loading={verdictLoading}
+            />
+          )}
+          
+          {/* Market Data Panel */}
           <MarketDataPanel 
             symbol={activeSymbol}
             onSymbolChange={handleSymbolSelect}
