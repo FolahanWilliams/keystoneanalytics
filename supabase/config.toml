@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.fundamentals]
 verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
