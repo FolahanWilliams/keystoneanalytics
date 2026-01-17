@@ -12,6 +12,56 @@ const logStep = (step: string, details?: any) => {
   console.log(`[CUSTOMER-PORTAL] ${step}${detailsStr}`);
 };
 
+// In-memory rate limiting store
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+// Rate limit configuration - 5 requests per minute for portal access
+const RATE_LIMIT = {
+  maxRequests: 5,
+  windowMs: 60 * 1000,
+};
+
+function checkRateLimit(userId: string): { allowed: boolean; remaining: number; resetIn: number } {
+  const now = Date.now();
+  const userLimit = rateLimitStore.get(userId);
+  
+  // Clean up expired entries periodically
+  if (rateLimitStore.size > 1000) {
+    for (const [key, value] of rateLimitStore.entries()) {
+      if (value.resetTime < now) {
+        rateLimitStore.delete(key);
+      }
+    }
+  }
+  
+  if (!userLimit || userLimit.resetTime < now) {
+    rateLimitStore.set(userId, {
+      count: 1,
+      resetTime: now + RATE_LIMIT.windowMs,
+    });
+    return {
+      allowed: true,
+      remaining: RATE_LIMIT.maxRequests - 1,
+      resetIn: RATE_LIMIT.windowMs,
+    };
+  }
+  
+  if (userLimit.count >= RATE_LIMIT.maxRequests) {
+    return {
+      allowed: false,
+      remaining: 0,
+      resetIn: userLimit.resetTime - now,
+    };
+  }
+  
+  userLimit.count++;
+  return {
+    allowed: true,
+    remaining: RATE_LIMIT.maxRequests - userLimit.count,
+    resetIn: userLimit.resetTime - now,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -41,6 +91,35 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id, email: user.email });
 
+    // Check rate limit for this user
+    const rateLimit = checkRateLimit(user.id);
+    if (!rateLimit.allowed) {
+      logStep("Rate limit exceeded", { userId: user.id, resetIn: rateLimit.resetIn });
+      return new Response(JSON.stringify({ 
+        error: "Too many portal requests. Please try again later.",
+        retryAfter: Math.ceil(rateLimit.resetIn / 1000),
+      }), {
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json",
+          "X-RateLimit-Limit": String(RATE_LIMIT.maxRequests),
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(Math.ceil(rateLimit.resetIn / 1000)),
+          "Retry-After": String(Math.ceil(rateLimit.resetIn / 1000)),
+        },
+        status: 429,
+      });
+    }
+
+    logStep("Rate limit check passed", { remaining: rateLimit.remaining });
+
+    // Rate limit headers for all responses
+    const rateLimitHeaders = {
+      "X-RateLimit-Limit": String(RATE_LIMIT.maxRequests),
+      "X-RateLimit-Remaining": String(rateLimit.remaining),
+      "X-RateLimit-Reset": String(Math.ceil(rateLimit.resetIn / 1000)),
+    };
+
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     
@@ -61,7 +140,7 @@ serve(async (req) => {
     logStep("Customer portal session created", { sessionId: portalSession.id });
 
     return new Response(JSON.stringify({ url: portalSession.url }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, ...rateLimitHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error) {
