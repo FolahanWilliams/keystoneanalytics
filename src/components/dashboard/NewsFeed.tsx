@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { TrendingUp, TrendingDown, Minus, ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMarketNews, NewsItem } from "@/hooks/useMarketNews";
@@ -19,7 +20,7 @@ interface NewsFeedProps {
   compact?: boolean;
 }
 
-const NewsFeed = ({ compact = false }: NewsFeedProps) => {
+const NewsFeed = memo(function NewsFeed({ compact = false }: NewsFeedProps) {
   const { news, loading, error, refetch } = useMarketNews("general");
   const displayNews = compact ? news.slice(0, 4) : news;
 
@@ -111,6 +112,6 @@ const NewsFeed = ({ compact = false }: NewsFeedProps) => {
       </div>
     </div>
   );
-};
+});
 
 export default NewsFeed;

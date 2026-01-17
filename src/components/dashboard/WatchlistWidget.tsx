@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { TrendingUp, TrendingDown, Plus, Loader2, Trash2, AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,7 +11,7 @@ interface WatchlistWidgetProps {
   selectedSymbol?: string;
 }
 
-const WatchlistWidget = ({ onSelectSymbol, selectedSymbol }: WatchlistWidgetProps) => {
+const WatchlistWidget = memo(function WatchlistWidget({ onSelectSymbol, selectedSymbol }: WatchlistWidgetProps) {
   const { watchlist, loading, error, addToWatchlist, removeFromWatchlist, refetch } = useWatchlist();
 
   if (loading) {
@@ -124,6 +125,6 @@ const WatchlistWidget = ({ onSelectSymbol, selectedSymbol }: WatchlistWidgetProp
       )}
     </div>
   );
-};
+});
 
 export default WatchlistWidget;
