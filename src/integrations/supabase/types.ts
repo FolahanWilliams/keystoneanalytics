@@ -169,7 +169,39 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      user_subscriptions_safe: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          created_at: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string | null
+          tier: Database["public"]["Enums"]["subscription_tier"] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string | null
+          tier?: Database["public"]["Enums"]["subscription_tier"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string | null
+          tier?: Database["public"]["Enums"]["subscription_tier"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

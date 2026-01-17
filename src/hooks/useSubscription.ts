@@ -4,12 +4,11 @@ import { toast } from "sonner";
 
 export type SubscriptionTier = "free" | "pro" | "elite";
 
+// Safe subscription interface - no Stripe IDs exposed to client
 export interface Subscription {
   id: string;
   user_id: string;
   tier: SubscriptionTier;
-  stripe_customer_id: string | null;
-  stripe_subscription_id: string | null;
   current_period_start: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
@@ -59,15 +58,16 @@ export const TIER_LIMITS = {
 export function useSubscription() {
   const queryClient = useQueryClient();
 
-  // Fetch subscription from database
+  // Fetch subscription from secure view (excludes Stripe IDs)
   const { data: subscription, isLoading, error, refetch } = useQuery({
     queryKey: ["subscription"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
+      // Use the safe view that excludes sensitive Stripe fields
       const { data, error } = await supabase
-        .from("user_subscriptions")
+        .from("user_subscriptions_safe")
         .select("*")
         .eq("user_id", user.id)
         .single();
