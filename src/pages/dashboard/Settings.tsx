@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings as SettingsIcon, User, Bell, Shield, Palette, Loader2, CreditCard, Crown, ExternalLink, RefreshCw, RotateCcw } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Shield, Palette, Loader2, CreditCard, Crown, ExternalLink, RefreshCw, RotateCcw, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,14 @@ import { cn } from "@/lib/utils";
 import { BentoModule, BentoGrid } from "@/components/ui/bento-module";
 import { motion } from "framer-motion";
 import { useTheme } from "next-themes";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const Settings = () => {
   const [email, setEmail] = useState("");
@@ -34,6 +42,20 @@ const Settings = () => {
   const { resetOnboarding } = useOnboarding();
   const { theme, setTheme } = useTheme();
 
+  // Notification preferences
+  const [notifyPriceAlerts, setNotifyPriceAlerts] = useState(false);
+  const [notifyNewsAlerts, setNotifyNewsAlerts] = useState(false);
+  const [notifyPortfolioUpdates, setNotifyPortfolioUpdates] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+
+  // Password change state
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -45,12 +67,17 @@ const Settings = () => {
         if (user?.id) {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("display_name")
+            .select("display_name, notify_price_alerts, notify_news_alerts, notify_portfolio_updates")
             .eq("user_id", user.id)
             .maybeSingle();
 
-          if (profile?.display_name) {
-            setDisplayName(profile.display_name);
+          if (profile) {
+            if (profile.display_name) {
+              setDisplayName(profile.display_name);
+            }
+            setNotifyPriceAlerts(profile.notify_price_alerts || false);
+            setNotifyNewsAlerts(profile.notify_news_alerts || false);
+            setNotifyPortfolioUpdates(profile.notify_portfolio_updates || false);
           }
         }
       } catch (error) {
@@ -90,6 +117,100 @@ const Settings = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleNotificationChange = async (
+    field: "notify_price_alerts" | "notify_news_alerts" | "notify_portfolio_updates",
+    value: boolean
+  ) => {
+    // Update local state immediately for responsiveness
+    if (field === "notify_price_alerts") setNotifyPriceAlerts(value);
+    if (field === "notify_news_alerts") setNotifyNewsAlerts(value);
+    if (field === "notify_portfolio_updates") setNotifyPortfolioUpdates(value);
+
+    setNotificationsLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ [field]: value })
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Preference updated",
+        description: "Your notification preference has been saved.",
+      });
+    } catch (error) {
+      console.error("Error updating notification:", error);
+      // Revert on error
+      if (field === "notify_price_alerts") setNotifyPriceAlerts(!value);
+      if (field === "notify_news_alerts") setNotifyNewsAlerts(!value);
+      if (field === "notify_portfolio_updates") setNotifyPortfolioUpdates(!value);
+      toast({
+        title: "Error",
+        description: "Failed to update preference. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      toast({
+        title: "Password too short",
+        description: "Password must be at least 6 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Passwords don't match",
+        description: "Please make sure both passwords match.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Password updated",
+        description: "Your password has been changed successfully.",
+      });
+      setShowPasswordDialog(false);
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error: any) {
+      console.error("Error changing password:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change password. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const handleTwoFactorClick = () => {
+    toast({
+      title: "Coming Soon",
+      description: "Two-factor authentication will be available in a future update.",
+    });
   };
 
   if (loading) {
@@ -251,39 +372,76 @@ const Settings = () => {
         {/* Notifications Section */}
         <BentoModule size="full" title="Notifications" delay={2}>
           <div className="space-y-4">
-            {[
-              { id: "price-alerts", label: "Price Alerts", description: "Get notified when assets hit target", requiresPro: true },
-              { id: "news-alerts", label: "News Alerts", description: "Receive breaking market news", requiresPro: true },
-              { id: "portfolio-alerts", label: "Portfolio Updates", description: "Daily portfolio summary", requiresPro: false },
-            ].map((item) => (
-              <div key={item.id} className="flex items-center justify-between py-1">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor={item.id} className="text-sm font-medium">{item.label}</Label>
-                    {item.requiresPro && !isPro && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">Pro</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{item.description}</p>
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="price-alerts" className="text-sm font-medium">Price Alerts</Label>
+                  {!isPro && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">Pro</span>
+                  )}
                 </div>
-                <Switch 
-                  id={item.id} 
-                  disabled={item.requiresPro && !isPro}
-                  className="scale-90"
-                />
+                <p className="text-xs text-muted-foreground">Get notified when assets hit target</p>
               </div>
-            ))}
+              <Switch 
+                id="price-alerts"
+                checked={notifyPriceAlerts}
+                onCheckedChange={(checked) => handleNotificationChange("notify_price_alerts", checked)}
+                disabled={!isPro || notificationsLoading}
+                className="scale-90"
+              />
+            </div>
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="news-alerts" className="text-sm font-medium">News Alerts</Label>
+                  {!isPro && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">Pro</span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Receive breaking market news</p>
+              </div>
+              <Switch 
+                id="news-alerts"
+                checked={notifyNewsAlerts}
+                onCheckedChange={(checked) => handleNotificationChange("notify_news_alerts", checked)}
+                disabled={!isPro || notificationsLoading}
+                className="scale-90"
+              />
+            </div>
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <Label htmlFor="portfolio-alerts" className="text-sm font-medium">Portfolio Updates</Label>
+                <p className="text-xs text-muted-foreground">Daily portfolio summary</p>
+              </div>
+              <Switch 
+                id="portfolio-alerts"
+                checked={notifyPortfolioUpdates}
+                onCheckedChange={(checked) => handleNotificationChange("notify_portfolio_updates", checked)}
+                disabled={notificationsLoading}
+                className="scale-90"
+              />
+            </div>
           </div>
         </BentoModule>
 
         {/* Security Section */}
         <BentoModule size="full" title="Security" delay={3}>
           <div className="space-y-2">
-            <Button variant="ghost" size="sm" className="w-full justify-start h-9 text-sm text-muted-foreground hover:text-foreground">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full justify-start h-9 text-sm text-muted-foreground hover:text-foreground"
+              onClick={() => setShowPasswordDialog(true)}
+            >
               <Shield className="w-4 h-4 mr-2" />
               Change Password
             </Button>
-            <Button variant="ghost" size="sm" className="w-full justify-start h-9 text-sm text-muted-foreground hover:text-foreground">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full justify-start h-9 text-sm text-muted-foreground hover:text-foreground"
+              onClick={handleTwoFactorClick}
+            >
               <Shield className="w-4 h-4 mr-2" />
               Enable Two-Factor Authentication
             </Button>
@@ -332,6 +490,97 @@ const Settings = () => {
         {saving && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
         Save Changes
       </Button>
+
+      {/* Password Change Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+            <DialogDescription>
+              Enter your new password below. Password must be at least 6 characters.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPasswordDialog(false);
+                setNewPassword("");
+                setConfirmPassword("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleChangePassword}
+              disabled={passwordLoading || !newPassword || !confirmPassword}
+            >
+              {passwordLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update Password'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 };

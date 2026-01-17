@@ -79,6 +79,9 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          notify_news_alerts: boolean | null
+          notify_portfolio_updates: boolean | null
+          notify_price_alerts: boolean | null
           onboarding_completed: boolean | null
           onboarding_completed_at: string | null
           updated_at: string
@@ -88,6 +91,9 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          notify_news_alerts?: boolean | null
+          notify_portfolio_updates?: boolean | null
+          notify_price_alerts?: boolean | null
           onboarding_completed?: boolean | null
           onboarding_completed_at?: string | null
           updated_at?: string
@@ -97,6 +103,9 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          notify_news_alerts?: boolean | null
+          notify_portfolio_updates?: boolean | null
+          notify_price_alerts?: boolean | null
           onboarding_completed?: boolean | null
           onboarding_completed_at?: string | null
           updated_at?: string
