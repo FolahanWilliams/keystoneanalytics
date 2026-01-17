@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Outlet, useLocation, useSearchParams } from "react-router-dom";
+import { useNavigate, Outlet, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Session } from "@supabase/supabase-js";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -12,13 +12,10 @@ const Dashboard = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  // Get symbol from URL if present (used when navigating from watchlist)
   const urlSymbol = searchParams.get("symbol");
 
-  // Onboarding state
   const {
     isLoading: onboardingLoading,
     showWelcomeModal,
@@ -56,8 +53,8 @@ const Dashboard = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-muted-foreground text-sm">Loading dashboard...</p>
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -70,14 +67,15 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background flex w-full">
       <DashboardSidebar />
-      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
+      
+      <div className="flex-1 flex flex-col min-h-screen overflow-hidden md:ml-0">
         <MarketOverview />
-        <main className="flex-1 overflow-y-auto p-6 scrollbar-terminal">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-terminal">
           <Outlet context={{ urlSymbol }} />
         </main>
       </div>
 
-      {/* Onboarding Components */}
+      {/* Onboarding */}
       {!onboardingLoading && (
         <>
           <WelcomeModal
