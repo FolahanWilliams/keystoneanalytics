@@ -80,15 +80,14 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const results = [];
-    const pricingUrl = `${Deno.env.get("SUPABASE_URL")?.replace('.supabase.co', '')}/pricing`;
 
     for (const user of usersToNotify) {
       const name = user.displayName || "Trader";
       
       const emailResponse = await resend.emails.send({
-        from: "Pulse Terminal <noreply@resend.dev>",
+        from: "Keystone Analytics <noreply@keystoneanalytics.org>",
         to: [user.email],
-        subject: `Your Pulse Terminal trial expires in ${daysRemaining} days`,
+        subject: `Your Keystone Analytics trial expires in ${daysRemaining} days`,
         html: `
           <!DOCTYPE html>
           <html>
@@ -99,13 +98,13 @@ const handler = async (req: Request): Promise<Response> => {
           <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0a0a0b; color: #ffffff; padding: 40px 20px; margin: 0;">
             <div style="max-width: 560px; margin: 0 auto; background: linear-gradient(145deg, #111113 0%, #0a0a0b 100%); border: 1px solid #222; border-radius: 16px; padding: 40px;">
               <div style="text-align: center; margin-bottom: 32px;">
-                <h1 style="color: #10b981; font-size: 24px; margin: 0;">Pulse Terminal</h1>
+                <h1 style="color: #10b981; font-size: 28px; margin: 0;">Keystone Analytics</h1>
               </div>
               
               <h2 style="font-size: 20px; margin-bottom: 16px; color: #fff;">Hi ${name}, Your Trial is Ending Soon</h2>
               
               <p style="color: #a1a1aa; line-height: 1.6; margin-bottom: 24px;">
-                Your free trial of Pulse Terminal will expire in <strong style="color: #f59e0b;">${daysRemaining} days</strong>. Don't lose access to:
+                Your free trial of Keystone Analytics will expire in <strong style="color: #f59e0b;">${daysRemaining} days</strong>. Don't lose access to:
               </p>
               
               <ul style="color: #a1a1aa; line-height: 1.8; margin-bottom: 24px; padding-left: 20px;">
@@ -116,7 +115,7 @@ const handler = async (req: Request): Promise<Response> => {
               </ul>
               
               <div style="text-align: center; margin: 32px 0;">
-                <a href="https://pulseterminal.lovable.app/pricing" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                <a href="https://keystoneanalytics.org/pricing" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
                   Upgrade to Pro
                 </a>
               </div>
@@ -128,7 +127,7 @@ const handler = async (req: Request): Promise<Response> => {
               <hr style="border: none; border-top: 1px solid #222; margin: 32px 0;">
               
               <p style="color: #52525b; font-size: 12px; text-align: center;">
-                © ${new Date().getFullYear()} Pulse Terminal. All rights reserved.
+                © ${new Date().getFullYear()} Keystone Analytics. All rights reserved.
               </p>
             </div>
           </body>

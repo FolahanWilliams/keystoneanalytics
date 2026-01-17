@@ -14,7 +14,7 @@ User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://pulseterminal.lovable.app/sitemap.xml
+Sitemap: https://keystoneanalytics.org/sitemap.xml
 
 # Disallow dashboard and auth pages from indexing
 User-agent: *
