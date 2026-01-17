@@ -11,6 +11,12 @@ import {
   Activity,
   Sparkles
 } from "lucide-react";
+import { MobileNav } from "@/components/layout/MobileNav";
+
+const navItems = [
+  { label: "Academy", href: "/academy" },
+  { label: "Pricing", href: "/pricing" },
+];
 
 const Landing = () => {
   return (
@@ -31,7 +37,9 @@ const Landing = () => {
           <Activity className="w-8 h-8 text-primary" />
           <span className="text-xl font-bold tracking-tight">Pulse Terminal</span>
         </Link>
-        <div className="flex items-center gap-4">
+        
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex items-center gap-4">
           <Link to="/academy">
             <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
               Academy
@@ -53,6 +61,9 @@ const Landing = () => {
             </Button>
           </Link>
         </div>
+        
+        {/* Mobile Navigation */}
+        <MobileNav items={navItems} />
       </nav>
 
       {/* Hero Section */}
@@ -163,11 +174,11 @@ const Landing = () => {
             <Activity className="w-5 h-5" />
             <span className="text-sm">© 2026 Pulse Terminal</span>
           </div>
-          <div className="flex gap-6 text-sm text-muted-foreground">
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm text-muted-foreground">
             <Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
-            <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-            <a href="#" className="hover:text-foreground transition-colors">Terms</a>
-            <a href="#" className="hover:text-foreground transition-colors">Contact</a>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+            <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+            <a href="mailto:support@pulseterminal.app" className="hover:text-foreground transition-colors">Contact</a>
           </div>
         </div>
       </footer>
