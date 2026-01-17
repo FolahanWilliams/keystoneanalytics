@@ -15,33 +15,33 @@ interface MarketDataPanelProps {
 // Calculate RSI using Wilder's smoothing method (proper RSI calculation)
 function calculateRSI(closes: number[], period = 14): number {
   if (closes.length < period + 1) return 50;
-  
+
   // Calculate initial average gain and loss
   let avgGain = 0;
   let avgLoss = 0;
-  
+
   for (let i = 1; i <= period; i++) {
     const change = closes[i] - closes[i - 1];
     if (change > 0) avgGain += change;
     else avgLoss += Math.abs(change);
   }
-  
+
   avgGain /= period;
   avgLoss /= period;
-  
+
   // Apply Wilder's smoothing for the rest of the data
   for (let i = period + 1; i < closes.length; i++) {
     const change = closes[i] - closes[i - 1];
     const currentGain = change > 0 ? change : 0;
     const currentLoss = change < 0 ? Math.abs(change) : 0;
-    
+
     avgGain = (avgGain * (period - 1) + currentGain) / period;
     avgLoss = (avgLoss * (period - 1) + currentLoss) / period;
   }
-  
+
   if (avgLoss === 0) return 100;
   const rs = avgGain / avgLoss;
-  return 100 - (100 / (1 + rs));
+  return 100 - 100 / (1 + rs);
 }
 
 // Calculate SMA
