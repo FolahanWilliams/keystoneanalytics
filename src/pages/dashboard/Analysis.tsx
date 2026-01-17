@@ -1,17 +1,22 @@
 import { useState } from "react";
 import AdvancedChart from "@/components/charts/AdvancedChart";
 import { DecisionEngineVerdict } from "@/components/premium/DecisionEngineVerdict";
+import { MasterVerdict } from "@/components/verdict/MasterVerdict";
 import { StockChatWidget } from "@/components/coach/StockChatWidget";
 import { StockSearch } from "@/components/dashboard/StockSearch";
 import { StockResearchPanel } from "@/components/research/StockResearchPanel";
 import { CompanyFundamentals } from "@/components/dashboard/CompanyFundamentals";
 import { BarChart3 } from "lucide-react";
 import { useQuotes } from "@/hooks/useMarketData";
+import { useVerdict } from "@/hooks/useVerdict";
 
 const Analysis = () => {
   const [selectedSymbol, setSelectedSymbol] = useState("AAPL");
   const { quotes } = useQuotes([selectedSymbol]);
   const quote = quotes[0];
+  
+  // Get verdict data for the selected symbol
+  const { verdict, loading: verdictLoading } = useVerdict({ symbol: selectedSymbol });
 
   const handleSymbolSelect = (symbol: string) => {
     setSelectedSymbol(symbol);
@@ -43,7 +48,16 @@ const Analysis = () => {
 
         {/* Right sidebar - Fundamentals, Research + AI Chat stacked */}
         <div className="xl:col-span-4 flex flex-col gap-4">
-          {/* Decision Engine Verdict */}
+          {/* Master Verdict - Primary analytical hook */}
+          {verdict && (
+            <MasterVerdict 
+              verdict={verdict}
+              symbol={selectedSymbol}
+              loading={verdictLoading}
+            />
+          )}
+
+          {/* Decision Engine Verdict (Legacy - can remove if redundant) */}
           <DecisionEngineVerdict 
             symbol={selectedSymbol}
             price={quote?.price}
