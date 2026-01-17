@@ -18,6 +18,60 @@ const PRODUCT_TIERS: Record<string, "pro" | "elite"> = {
   "prod_TnBdtNU1QhbSId": "elite",
 };
 
+// In-memory rate limiting store
+// Key: user_id, Value: { count: number, resetTime: number }
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+// Rate limit configuration
+const RATE_LIMIT = {
+  maxRequests: 10,      // Max requests per window
+  windowMs: 60 * 1000,  // 1 minute window
+};
+
+function checkRateLimit(userId: string): { allowed: boolean; remaining: number; resetIn: number } {
+  const now = Date.now();
+  const userLimit = rateLimitStore.get(userId);
+  
+  // Clean up expired entries periodically
+  if (rateLimitStore.size > 1000) {
+    for (const [key, value] of rateLimitStore.entries()) {
+      if (value.resetTime < now) {
+        rateLimitStore.delete(key);
+      }
+    }
+  }
+  
+  if (!userLimit || userLimit.resetTime < now) {
+    // First request or window expired - start new window
+    rateLimitStore.set(userId, {
+      count: 1,
+      resetTime: now + RATE_LIMIT.windowMs,
+    });
+    return {
+      allowed: true,
+      remaining: RATE_LIMIT.maxRequests - 1,
+      resetIn: RATE_LIMIT.windowMs,
+    };
+  }
+  
+  if (userLimit.count >= RATE_LIMIT.maxRequests) {
+    // Rate limit exceeded
+    return {
+      allowed: false,
+      remaining: 0,
+      resetIn: userLimit.resetTime - now,
+    };
+  }
+  
+  // Increment counter
+  userLimit.count++;
+  return {
+    allowed: true,
+    remaining: RATE_LIMIT.maxRequests - userLimit.count,
+    resetIn: userLimit.resetTime - now,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -47,8 +101,37 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id, email: user.email });
 
+    // Check rate limit for this user
+    const rateLimit = checkRateLimit(user.id);
+    if (!rateLimit.allowed) {
+      logStep("Rate limit exceeded", { userId: user.id, resetIn: rateLimit.resetIn });
+      return new Response(JSON.stringify({ 
+        error: "Rate limit exceeded. Please try again later.",
+        retryAfter: Math.ceil(rateLimit.resetIn / 1000),
+      }), {
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json",
+          "X-RateLimit-Limit": String(RATE_LIMIT.maxRequests),
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(Math.ceil(rateLimit.resetIn / 1000)),
+          "Retry-After": String(Math.ceil(rateLimit.resetIn / 1000)),
+        },
+        status: 429,
+      });
+    }
+
+    logStep("Rate limit check passed", { remaining: rateLimit.remaining });
+
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+
+    // Add rate limit headers to all responses
+    const rateLimitHeaders = {
+      "X-RateLimit-Limit": String(RATE_LIMIT.maxRequests),
+      "X-RateLimit-Remaining": String(rateLimit.remaining),
+      "X-RateLimit-Reset": String(Math.ceil(rateLimit.resetIn / 1000)),
+    };
 
     if (customers.data.length === 0) {
       logStep("No Stripe customer found - user is on free tier");
@@ -71,7 +154,7 @@ serve(async (req) => {
         subscribed: false,
         tier: "free",
       }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, ...rateLimitHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
@@ -105,9 +188,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({ 
         subscribed: false,
         tier: "free",
-        stripe_customer_id: customerId,
       }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, ...rateLimitHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
@@ -146,9 +228,8 @@ serve(async (req) => {
       tier,
       subscription_end: subscriptionEnd,
       cancel_at_period_end: subscription.cancel_at_period_end,
-      stripe_customer_id: customerId,
     }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, ...rateLimitHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error) {
