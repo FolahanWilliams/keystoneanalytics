@@ -1,27 +1,77 @@
 import { useState, useEffect } from "react";
-import { useOutletContext } from "react-router-dom";
-import AdvancedChart from "@/components/charts/AdvancedChart";
+import { useNavigate } from "react-router-dom";
 import WatchlistWidget from "@/components/dashboard/WatchlistWidget";
 import NewsFeed from "@/components/dashboard/NewsFeed";
 import EconomicIndicators from "@/components/dashboard/EconomicIndicators";
-import { BentoModule, BentoGrid, BentoStat } from "@/components/ui/bento-module";
-import { Activity, Zap, BarChart3, TrendingUp } from "lucide-react";
+import { Activity, Zap, BarChart3, TrendingUp, LineChart, Brain, Globe, ArrowRight, DollarSign, Percent, Building } from "lucide-react";
 import { motion } from "framer-motion";
-
-interface OutletContextType {
-  urlSymbol?: string | null;
-}
+import { Button } from "@/components/ui/button";
+import { useFredData } from "@/hooks/useFredData";
 
 const Overview = () => {
-  const context = useOutletContext<OutletContextType>();
-  const urlSymbol = context?.urlSymbol;
-  const [selectedSymbol, setSelectedSymbol] = useState("AAPL");
-  
-  useEffect(() => {
-    if (urlSymbol) {
-      setSelectedSymbol(urlSymbol);
-    }
-  }, [urlSymbol]);
+  const navigate = useNavigate();
+  const { indicators, loading: fredLoading } = useFredData();
+
+  // Quick action cards for navigation
+  const quickActions = [
+    {
+      title: "Analyze Stock",
+      description: "Deep-dive into any ticker with AI-powered insights",
+      icon: LineChart,
+      path: "/dashboard/analysis",
+      color: "primary",
+    },
+    {
+      title: "AI Coach",
+      description: "Get personalized market guidance and strategies",
+      icon: Brain,
+      path: "/dashboard/coach",
+      color: "info",
+    },
+    {
+      title: "Macro Overview",
+      description: "View comprehensive economic indicators",
+      icon: Globe,
+      path: "/dashboard/macro",
+      color: "warning",
+    },
+  ];
+
+  // Market conditions indicators
+  const marketConditions = [
+    {
+      label: "Rate Environment",
+      value: fredLoading ? "..." : indicators?.find(i => i.id === 'FEDFUNDS')?.value?.toFixed(2) || "5.33",
+      unit: "%",
+      status: "neutral",
+      description: "Fed Funds Rate",
+      icon: Percent,
+    },
+    {
+      label: "10Y Treasury",
+      value: fredLoading ? "..." : indicators?.find(i => i.id === 'DGS10')?.value?.toFixed(2) || "4.28",
+      unit: "%",
+      status: "neutral",
+      description: "10-Year Yield",
+      icon: TrendingUp,
+    },
+    {
+      label: "S&P 500 PE",
+      value: fredLoading ? "..." : indicators?.find(i => i.id === 'SP500_PE')?.value?.toFixed(1) || "28.5",
+      unit: "x",
+      status: "elevated",
+      description: "Valuation",
+      icon: BarChart3,
+    },
+    {
+      label: "Unemployment",
+      value: fredLoading ? "..." : indicators?.find(i => i.id === 'UNRATE')?.value?.toFixed(1) || "3.8",
+      unit: "%",
+      status: "healthy",
+      description: "Labor Market",
+      icon: Building,
+    },
+  ];
 
   return (
     <div className="space-y-4">
@@ -67,18 +117,85 @@ const Overview = () => {
 
       {/* Main Content Grid - Bento Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        {/* Main Chart Area - Hero Module */}
+        {/* Market Conditions & Quick Actions - Hero Module */}
         <motion.div 
           className="lg:col-span-8"
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
         >
-          <div 
-            data-onboarding="chart" 
-            className="bento-module p-4 min-h-[480px]"
-          >
-            <AdvancedChart symbol={selectedSymbol} onSymbolChange={setSelectedSymbol} />
+          <div className="bento-module p-5 min-h-[480px]">
+            {/* Market Conditions Header */}
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Globe className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold">Market Conditions</h3>
+                <p className="text-xs text-muted-foreground">Real-time economic snapshot</p>
+              </div>
+            </div>
+
+            {/* Market Condition Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              {marketConditions.map((condition, index) => (
+                <motion.div
+                  key={condition.label}
+                  className="glass-panel p-4 rounded-xl"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.15 + index * 0.05 }}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <condition.icon className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{condition.label}</span>
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-xl font-mono font-bold tabular-nums">{condition.value}</span>
+                    <span className="text-xs text-muted-foreground">{condition.unit}</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">{condition.description}</p>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-border/50 my-5" />
+
+            {/* Quick Actions Section */}
+            <div className="flex items-center gap-2 mb-4">
+              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Quick Actions</h4>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {quickActions.map((action, index) => (
+                <motion.button
+                  key={action.title}
+                  onClick={() => navigate(action.path)}
+                  className="glass-panel-hover p-4 rounded-xl text-left group transition-all duration-200 hover:scale-[1.02]"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.25 + index * 0.05 }}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      action.color === 'primary' ? 'bg-primary/10' :
+                      action.color === 'info' ? 'bg-info/10' :
+                      'bg-warning/10'
+                    }`}>
+                      <action.icon className={`w-5 h-5 ${
+                        action.color === 'primary' ? 'text-primary' :
+                        action.color === 'info' ? 'text-info' :
+                        'text-warning'
+                      }`} />
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                  </div>
+                  <h5 className="text-sm font-semibold mb-1">{action.title}</h5>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{action.description}</p>
+                </motion.button>
+              ))}
+            </div>
           </div>
         </motion.div>
 
@@ -95,8 +212,7 @@ const Overview = () => {
               className="bento-module p-4 h-[260px]"
             >
               <WatchlistWidget 
-                onSelectSymbol={setSelectedSymbol} 
-                selectedSymbol={selectedSymbol}
+                onSelectSymbol={(symbol) => navigate(`/dashboard/analysis?symbol=${symbol}`)} 
               />
             </div>
           </motion.div>

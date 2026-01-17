@@ -13,6 +13,7 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { BentoModule, BentoGrid } from "@/components/ui/bento-module";
 import { motion } from "framer-motion";
+import { useTheme } from "next-themes";
 
 const Settings = () => {
   const [email, setEmail] = useState("");
@@ -31,6 +32,7 @@ const Settings = () => {
     isSyncing 
   } = useSubscription();
   const { resetOnboarding } = useOnboarding();
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -296,7 +298,11 @@ const Settings = () => {
                 <Label className="text-sm font-medium">Dark Mode</Label>
                 <p className="text-xs text-muted-foreground">Use dark theme</p>
               </div>
-              <Switch defaultChecked className="scale-90" />
+              <Switch 
+                checked={theme === 'dark'} 
+                onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+                className="scale-90" 
+              />
             </div>
 
             <div className="flex items-center justify-between py-1 pt-3 border-t border-border/30">

@@ -99,8 +99,73 @@
     --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
+  /* Light mode - Clean, professional light theme */
+  .light {
+    --background: 0 0% 98%;
+    --foreground: 240 10% 10%;
+    
+    --card: 0 0% 100%;
+    --card-elevated: 0 0% 99%;
+    --card-foreground: 240 10% 10%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 10%;
+    
+    --primary: 160 84% 32%;
+    --primary-foreground: 0 0% 100%;
+    --primary-soft: 160 60% 90%;
+    --primary-glow: 160 84% 40%;
+    
+    --secondary: 240 5% 94%;
+    --secondary-foreground: 240 10% 20%;
+    
+    --muted: 240 5% 92%;
+    --muted-foreground: 240 5% 45%;
+    
+    --accent: 240 5% 90%;
+    --accent-foreground: 240 10% 10%;
+    
+    --destructive: 350 89% 50%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 240 5% 88%;
+    --border-subtle: 240 5% 92%;
+    --input: 240 5% 90%;
+    --ring: 160 84% 32%;
+    
+    --gain: 160 84% 32%;
+    --loss: 350 89% 50%;
+    --warning: 38 92% 45%;
+    --info: 217 91% 55%;
+    --neutral: 240 5% 50%;
+    
+    --chart-bg: 0 0% 100%;
+    --chart-grid: 240 5% 92%;
+    --chart-candle-up: 160 84% 32%;
+    --chart-candle-down: 350 89% 50%;
+    
+    --glow-green: 160 84% 32%;
+    --glow-red: 350 89% 50%;
+    --glow-blue: 217 91% 55%;
+    
+    --terminal-green: 160 84% 32%;
+    --terminal-amber: 38 92% 45%;
+    
+    --glass-bg: 0 0% 100%;
+    --glass-border: 240 5% 88%;
+    
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5% 45%;
+    --sidebar-primary: 160 84% 32%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 5% 94%;
+    --sidebar-accent-foreground: 240 10% 10%;
+    --sidebar-border: 240 5% 90%;
+    --sidebar-ring: 160 84% 32%;
+  }
+
   .dark {
-    /* Dark mode uses same values - single theme */
+    /* Dark mode - Deep monochrome with emerald accent */
     --background: 240 10% 3.5%;
     --foreground: 0 0% 95%;
     --card: 240 6% 6%;
