@@ -51,65 +51,80 @@ function calculateSMA(data: number[], period: number): number {
   return data.slice(-period).reduce((a, b) => a + b, 0) / period;
 }
 
-// Calculate pivot points (Standard) for support/resistance
-function calculatePivotLevels(highs: number[], lows: number[], closes: number[], lookback: number = 60) {
+// Calculate pivot points (swing high/low levels) for support/resistance
+function calculatePivotLevels(
+  highs: number[],
+  lows: number[],
+  currentPrice: number,
+  lookback: number = 60
+) {
   const recentHighs = highs.slice(-lookback);
   const recentLows = lows.slice(-lookback);
-  const recentCloses = closes.slice(-lookback);
-  
+
   // Find swing highs and lows (local peaks/troughs)
   const swingHighs: number[] = [];
   const swingLows: number[] = [];
-  
+
   for (let i = 2; i < recentHighs.length - 2; i++) {
     // Swing high: higher than 2 bars on each side
-    if (recentHighs[i] > recentHighs[i - 1] && recentHighs[i] > recentHighs[i - 2] &&
-        recentHighs[i] > recentHighs[i + 1] && recentHighs[i] > recentHighs[i + 2]) {
+    if (
+      recentHighs[i] > recentHighs[i - 1] &&
+      recentHighs[i] > recentHighs[i - 2] &&
+      recentHighs[i] > recentHighs[i + 1] &&
+      recentHighs[i] > recentHighs[i + 2]
+    ) {
       swingHighs.push(recentHighs[i]);
     }
     // Swing low: lower than 2 bars on each side
-    if (recentLows[i] < recentLows[i - 1] && recentLows[i] < recentLows[i - 2] &&
-        recentLows[i] < recentLows[i + 1] && recentLows[i] < recentLows[i + 2]) {
+    if (
+      recentLows[i] < recentLows[i - 1] &&
+      recentLows[i] < recentLows[i - 2] &&
+      recentLows[i] < recentLows[i + 1] &&
+      recentLows[i] < recentLows[i + 2]
+    ) {
       swingLows.push(recentLows[i]);
     }
   }
-  
-  const currentPrice = recentCloses[recentCloses.length - 1];
-  
-  // Find nearest resistance (swing high above current price)
-  const resistanceLevels = swingHighs.filter(h => h > currentPrice).sort((a, b) => a - b);
-  // Find nearest support (swing low below current price)
-  const supportLevels = swingLows.filter(l => l < currentPrice).sort((a, b) => b - a);
-  
-  // Fallback to period high/low if no swing points found
-  const resistance = resistanceLevels[0] || Math.max(...recentHighs);
-  const support = supportLevels[0] || Math.min(...recentLows);
-  
+
+  // Nearest resistance (swing high ABOVE current price)
+  const resistanceLevels = swingHighs.filter((h) => h > currentPrice).sort((a, b) => a - b);
+  // Nearest support (swing low BELOW current price)
+  const supportLevels = swingLows.filter((l) => l < currentPrice).sort((a, b) => b - a);
+
+  // Fallback to lookback high/low if no swing points found
+  const resistance = resistanceLevels[0] ?? Math.max(...recentHighs);
+  const support = supportLevels[0] ?? Math.min(...recentLows);
+
   return { support, resistance };
 }
 
-// Calculate 30-day performance using correct date comparison
-function calculate30DayPerformance(candles: { close: number; timestamp: number }[]): number | null {
+// Calculate 30-day performance: compare CURRENT PRICE vs CLOSE from ~30 days ago
+function calculate30DayPerformance(
+  candles: { close: number; timestamp: number }[],
+  currentPrice: number
+): { changePercent: number; startClose: number; startDate: Date } | null {
   if (candles.length < 2) return null;
-  
-  const currentPrice = candles[candles.length - 1].close;
+
   const currentTimestamp = candles[candles.length - 1].timestamp;
-  const thirtyDaysAgo = currentTimestamp - (30 * 24 * 60 * 60);
-  
-  // Find the candle closest to 30 days ago
-  let closestCandle = candles[0];
-  let closestDiff = Math.abs(candles[0].timestamp - thirtyDaysAgo);
-  
-  for (const candle of candles) {
-    const diff = Math.abs(candle.timestamp - thirtyDaysAgo);
-    if (diff < closestDiff) {
-      closestDiff = diff;
-      closestCandle = candle;
+  const targetTs = currentTimestamp - 30 * 24 * 60 * 60;
+
+  // Find the most recent candle at-or-before targetTs (avoid choosing a "future" candle)
+  let start = candles[0];
+  for (let i = candles.length - 1; i >= 0; i--) {
+    if (candles[i].timestamp <= targetTs) {
+      start = candles[i];
+      break;
     }
   }
-  
-  if (closestCandle.close === 0) return null;
-  return ((currentPrice - closestCandle.close) / closestCandle.close) * 100;
+
+  if (!start?.close) return null;
+  const changePercent = ((currentPrice - start.close) / start.close) * 100;
+
+  return {
+    changePercent,
+    startClose: start.close,
+    startDate: new Date(start.timestamp * 1000),
+  };
 }
 
 // Minimum data points required for reliable calculations
@@ -130,17 +145,23 @@ export function MarketDataPanel({ symbol, onSymbolChange }: MarketDataPanelProps
     const closes = candles.map(c => c.close);
     const highs = candles.map(c => c.high);
     const lows = candles.map(c => c.low);
+
+    // Use live quote price when available (prevents "outdated" last candle)
+    const currentPrice = quote?.price ?? closes[closes.length - 1];
     
     // Calculate SMAs using most recent data
     const sma20 = calculateSMA(closes, 20);
     const sma50 = closes.length >= 50 ? calculateSMA(closes, 50) : null;
     const rsi = calculateRSI(closes);
-    
-    // Calculate proper pivot-based support/resistance
-    const { support, resistance } = calculatePivotLevels(highs, lows, closes, Math.min(60, closes.length));
-    
-    const currentPrice = closes[closes.length - 1];
-    
+
+    // Calculate proper pivot-based support/resistance from last ~3 months, relative to CURRENT price
+    const { support, resistance } = calculatePivotLevels(
+      highs,
+      lows,
+      currentPrice,
+      Math.min(60, closes.length)
+    );
+
     let trend = "Neutral";
     if (sma50 !== null) {
       if (currentPrice > sma20 && sma20 > sma50) trend = "Bullish";
@@ -152,13 +173,13 @@ export function MarketDataPanel({ symbol, onSymbolChange }: MarketDataPanelProps
       if (currentPrice > sma20 * 1.02) trend = "Mildly Bullish";
       else if (currentPrice < sma20 * 0.98) trend = "Mildly Bearish";
     }
-    
-    return { sma20, sma50, rsi, support, resistance, trend };
+
+    return { sma20, sma50, rsi, support, resistance, trend, currentPrice };
   })() : null;
-  
-  // Calculate 30-day performance separately
-  const performance30d = candles && candles.length >= 20 
-    ? calculate30DayPerformance(candles) 
+
+  // Calculate 30-day performance using CURRENT price
+  const performance30d = candles && candles.length >= 20
+    ? calculate30DayPerformance(candles, quote?.price ?? candles[candles.length - 1].close)
     : null;
 
   const handleRefresh = () => {
@@ -333,15 +354,15 @@ export function MarketDataPanel({ symbol, onSymbolChange }: MarketDataPanelProps
         {candles && candles.length > 0 && performance30d !== null && (
           <div className="pt-2 border-t border-border/50">
             <p className="text-xs text-muted-foreground mb-2">30-Day Performance</p>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Badge 
-                variant={performance30d >= 0 ? "default" : "destructive"}
+                variant={performance30d.changePercent >= 0 ? "default" : "destructive"}
                 className="font-mono"
               >
-                {performance30d >= 0 ? "+" : ""}{performance30d.toFixed(2)}%
+                {performance30d.changePercent >= 0 ? "+" : ""}{performance30d.changePercent.toFixed(2)}%
               </Badge>
               <span className="text-xs text-muted-foreground">
-                {candles.length} trading days available
+                vs ${performance30d.startClose.toFixed(2)} on {performance30d.startDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
               </span>
             </div>
           </div>

@@ -192,7 +192,7 @@ export function MasterVerdict({ verdict, symbol, loading, onUnlockClick }: Maste
 
   if (loading) {
     return (
-      <Card className="bg-[hsl(240,10%,4%)] border-border/50">
+      <Card className="relative bg-[hsl(240,10%,4%)] border-border/50">
         <CardContent className="py-12 flex flex-col items-center justify-center">
           <div className="w-12 h-12 border-2 border-primary/30 border-t-primary rounded-full animate-spin mb-4" />
           <p className="text-sm text-muted-foreground">Calculating verdict...</p>
@@ -202,7 +202,7 @@ export function MasterVerdict({ verdict, symbol, loading, onUnlockClick }: Maste
   }
 
   return (
-    <Card className="bg-[hsl(240,10%,4%)] border-border/50 overflow-hidden">
+    <Card className="relative bg-[hsl(240,10%,4%)] border-border/50 overflow-hidden">
       {/* Subtle glow effect based on verdict */}
       <div 
         className="absolute inset-0 opacity-20 pointer-events-none"
