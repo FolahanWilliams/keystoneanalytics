@@ -79,7 +79,7 @@ export default function Academy() {
       <nav className="relative z-10 flex items-center justify-between px-6 py-4 lg:px-12 border-b border-border/50">
         <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <Activity className="w-7 h-7 text-primary" />
-          <span className="text-xl font-bold tracking-tight">Pulse Terminal</span>
+          <span className="text-xl font-bold tracking-tight">Keystone Analytics</span>
         </Link>
 
         <div className="flex items-center gap-3">
@@ -107,7 +107,7 @@ export default function Academy() {
           Educational Hub
         </Badge>
         <h1 className="text-4xl lg:text-5xl font-bold mb-4">
-          The <span className="gradient-text">Pulse Academy</span>
+          The <span className="gradient-text">Keystone Academy</span>
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
           Think Like an Analyst, Not a Gambler. Master the mechanics of value through structured,

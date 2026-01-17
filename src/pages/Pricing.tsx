@@ -191,7 +191,7 @@ export default function Pricing() {
       <nav className="relative z-10 flex items-center justify-between px-6 py-4 lg:px-12">
         <Link to="/" className="flex items-center gap-2">
           <Activity className="w-8 h-8 text-primary" />
-          <span className="text-xl font-bold tracking-tight">Pulse Terminal</span>
+          <span className="text-xl font-bold tracking-tight">Keystone Analytics</span>
         </Link>
         <div className="flex items-center gap-4">
           <Link to="/auth">
@@ -470,7 +470,7 @@ export default function Pricing() {
           <Shield className="w-12 h-12 text-primary mx-auto mb-4" />
           <h2 className="text-3xl font-bold mb-4">Ready to Elevate Your Trading?</h2>
           <p className="text-muted-foreground mb-8">
-            Join thousands of traders who use Pulse Terminal to make smarter decisions.
+            Join thousands of traders who use Keystone Analytics to make smarter decisions.
           </p>
           <Link to="/auth">
             <Button size="lg" className="gap-2 bg-gradient-to-r from-primary to-emerald-500 hover:from-primary/90 hover:to-emerald-500/90 px-8 h-12 text-base animate-glow-pulse">
@@ -485,7 +485,7 @@ export default function Pricing() {
         <div className="flex items-center justify-between max-w-6xl mx-auto">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Activity className="w-5 h-5" />
-            <span className="text-sm">© 2026 Pulse Terminal</span>
+            <span className="text-sm">© 2026 Keystone Analytics</span>
           </div>
           <div className="flex gap-6 text-sm text-muted-foreground">
             <a href="#" className="hover:text-foreground transition-colors">Privacy</a>

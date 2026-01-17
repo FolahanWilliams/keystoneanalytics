@@ -9,7 +9,7 @@ const PrivacyPolicy = () => {
       <nav className="flex items-center justify-between px-6 py-4 lg:px-12 border-b border-border/50">
         <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <Activity className="w-8 h-8 text-primary" />
-          <span className="text-xl font-bold tracking-tight">Pulse Terminal</span>
+          <span className="text-xl font-bold tracking-tight">Keystone Analytics</span>
         </Link>
         <Link to="/">
           <Button variant="ghost" className="gap-2">
@@ -27,7 +27,7 @@ const PrivacyPolicy = () => {
           <section>
             <h2 className="text-2xl font-semibold mb-4">1. Introduction</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Pulse Terminal ("we," "our," or "us") is committed to protecting your privacy. 
+              Keystone Analytics ("we," "our," or "us") is committed to protecting your privacy. 
               This Privacy Policy explains how we collect, use, disclose, and safeguard your 
               information when you use our trading intelligence platform.
             </p>
@@ -121,7 +121,7 @@ const PrivacyPolicy = () => {
             <p className="text-muted-foreground leading-relaxed">
               If you have questions about this Privacy Policy, please contact us at:
             </p>
-            <p className="text-primary mt-2">support@pulseterminal.app</p>
+            <p className="text-primary mt-2">support@keystoneanalytics.org</p>
           </section>
         </div>
       </main>
@@ -129,7 +129,7 @@ const PrivacyPolicy = () => {
       {/* Footer */}
       <footer className="px-6 py-8 border-t border-border/50">
         <div className="flex items-center justify-center text-sm text-muted-foreground">
-          <span>© 2026 Pulse Terminal. All rights reserved.</span>
+          <span>© 2026 Keystone Analytics. All rights reserved.</span>
         </div>
       </footer>
     </div>

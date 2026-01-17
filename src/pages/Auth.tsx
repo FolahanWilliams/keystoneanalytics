@@ -244,7 +244,7 @@ const Auth = () => {
     switch (mode) {
       case "forgot-password": return "Enter your email to receive a reset link";
       case "reset-password": return "Enter your new password below";
-      case "signup": return "Get started with Pulse Terminal";
+      case "signup": return "Get started with Keystone Analytics";
       default: return "Sign in to access your terminal";
     }
   };
@@ -273,7 +273,7 @@ const Auth = () => {
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
             <TrendingUp className="w-5 h-5 text-primary" />
           </div>
-          <span className="text-2xl font-bold tracking-tight">Pulse Terminal</span>
+          <span className="text-2xl font-bold tracking-tight">Keystone Analytics</span>
         </Link>
 
         {/* Auth Card */}

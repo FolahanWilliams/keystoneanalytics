@@ -136,7 +136,7 @@ export function DashboardSidebar() {
                 exit={{ opacity: 0, width: 0 }}
                 className="font-semibold text-sm text-foreground whitespace-nowrap overflow-hidden"
               >
-                Pulse Terminal
+                Keystone Analytics
               </motion.span>
             )}
           </AnimatePresence>
