@@ -1,9 +1,9 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import ErrorBoundary from "@/components/common/ErrorBoundary";
 import PageLoader from "@/components/common/PageLoader";
@@ -29,14 +29,48 @@ const Learn = lazy(() => import("./pages/dashboard/Learn"));
 const Coach = lazy(() => import("./pages/dashboard/Coach"));
 const MacroOverview = lazy(() => import("./pages/dashboard/MacroOverview"));
 
+// Optimized QueryClient with performance settings
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 2,
       staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 10, // 10 minutes (previously cacheTime)
+      refetchOnWindowFocus: false, // Prevent unnecessary refetches
+      refetchOnReconnect: true,
     },
   },
 });
+
+// Route prefetching component
+const RoutePrefetcher = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    // Prefetch likely next routes based on current location
+    const prefetchRoutes = async () => {
+      if (location.pathname === "/") {
+        // On landing, prefetch auth and pricing
+        import("./pages/Auth");
+        import("./pages/Pricing");
+      } else if (location.pathname === "/auth") {
+        // After auth, user likely goes to dashboard
+        import("./pages/Dashboard");
+        import("./pages/dashboard/Overview");
+      } else if (location.pathname.startsWith("/dashboard")) {
+        // Prefetch common dashboard routes
+        import("./pages/dashboard/Analysis");
+        import("./pages/dashboard/Coach");
+      }
+    };
+
+    // Delay prefetching to not block initial render
+    const timer = setTimeout(prefetchRoutes, 1000);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
+
+  return null;
+};
 
 const App = () => (
   <ErrorBoundary>
@@ -46,6 +80,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <RoutePrefetcher />
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/" element={<Index />} />
