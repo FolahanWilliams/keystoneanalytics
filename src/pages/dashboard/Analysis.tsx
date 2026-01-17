@@ -9,14 +9,21 @@ import { CompanyFundamentals } from "@/components/dashboard/CompanyFundamentals"
 import { BarChart3 } from "lucide-react";
 import { useQuotes } from "@/hooks/useMarketData";
 import { useVerdict } from "@/hooks/useVerdict";
+import { useTechnicalIndicators } from "@/hooks/useTechnicalIndicators";
 
 const Analysis = () => {
   const [selectedSymbol, setSelectedSymbol] = useState("AAPL");
   const { quotes } = useQuotes([selectedSymbol]);
   const quote = quotes[0];
   
-  // Get verdict data for the selected symbol
-  const { verdict, loading: verdictLoading } = useVerdict({ symbol: selectedSymbol });
+  // Get real technical indicators for the selected symbol
+  const { indicators } = useTechnicalIndicators(selectedSymbol);
+  
+  // Get verdict data using real technical indicators
+  const { verdict, loading: verdictLoading } = useVerdict({ 
+    symbol: selectedSymbol,
+    marketData: indicators,
+  });
 
   const handleSymbolSelect = (symbol: string) => {
     setSelectedSymbol(symbol);
