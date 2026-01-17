@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo } from "react";
 import {
   ComposedChart,
   Bar,
@@ -24,7 +24,7 @@ interface CandlestickChartProps {
 
 const timeframes: TimeframeType[] = ["1H", "4H", "1D", "1W", "1M"];
 
-const CandlestickChart = ({ symbol = "AAPL", onSymbolChange }: CandlestickChartProps) => {
+const CandlestickChart = memo(function CandlestickChart({ symbol = "AAPL", onSymbolChange }: CandlestickChartProps) {
   const [selectedTf, setSelectedTf] = useState<TimeframeType>("1D");
   const [showSearch, setShowSearch] = useState(false);
   const { candles, loading, error, refetch } = useCandles(symbol, selectedTf);
@@ -290,6 +290,6 @@ const CandlestickChart = ({ symbol = "AAPL", onSymbolChange }: CandlestickChartP
       )}
     </div>
   );
-};
+});
 
 export default CandlestickChart;
