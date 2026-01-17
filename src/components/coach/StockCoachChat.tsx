@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Trash2, Sparkles, TrendingUp, Brain, Target, AlertTriangle, Loader2, X, StopCircle } from "lucide-react";
+import { Send, Trash2, Sparkles, TrendingUp, Brain, Target, AlertTriangle, X, StopCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -110,29 +110,60 @@ export function StockCoachChat({ initialSymbol, onSymbolMentioned }: StockCoachC
     }
   }, [initialSymbol]);
 
-  // Extract stock symbols from user message
+  // Extract stock symbols from a message (supports $AAPL, aapl, AAPL)
   const extractSymbols = (message: string): string[] => {
-    const symbolPattern = /\b([A-Z]{1,5})\b/g;
-    const matches = message.match(symbolPattern) || [];
-    const commonWords = new Set(['I', 'A', 'THE', 'AND', 'OR', 'FOR', 'TO', 'IN', 'IS', 'IT', 'BE', 'AS', 'AT', 'SO', 'WE', 'HE', 'BY', 'ON', 'DO', 'IF', 'ME', 'MY', 'UP', 'AN', 'GO', 'NO', 'US', 'AM', 'OF', 'AI', 'RSI', 'EMA', 'SMA', 'ATR', 'MACD', 'PE', 'EPS', 'CEO', 'CFO', 'IPO', 'ETF', 'GDP', 'CPI', 'FED', 'SEC', 'NYSE', 'DOW', 'USD', 'EUR', 'GBP', 'BUY', 'SELL', 'HOLD', 'STOP', 'LOSS', 'WHAT', 'WHEN', 'WHERE', 'WHY', 'HOW', 'CAN', 'ARE', 'WAS', 'HAS', 'HAD', 'WILL', 'THIS', 'THAT', 'ABOUT', 'YOUR', 'GIVE', 'NOW', 'SET']);
-    return matches.filter(s => s.length >= 2 && !commonWords.has(s));
+    // Match common ticker formats
+    const symbolPattern = /\$?\b([A-Z]{1,5})\b/gi;
+    const matches = Array.from(message.matchAll(symbolPattern)).map(m => (m[1] || "").toUpperCase());
+
+    // Filter obvious non-tickers
+    const commonWords = new Set([
+      'I','A','THE','AND','OR','FOR','TO','IN','IS','IT','BE','AS','AT','SO','WE','HE','BY','ON','DO','IF','ME','MY','UP','AN','GO','NO','US','AM','OF',
+      'AI','RSI','EMA','SMA','ATR','MACD','PE','EPS','CEO','CFO','IPO','ETF','GDP','CPI','FED','SEC','NYSE','DOW','USD','EUR','GBP',
+      'BUY','SELL','HOLD','STOP','LOSS','WHAT','WHEN','WHERE','WHY','HOW','CAN','ARE','WAS','HAS','HAD','WILL','THIS','THAT','ABOUT','YOUR','GIVE','NOW','SET',
+    ]);
+
+    return matches
+      .filter(s => s.length >= 2 && s.length <= 5)
+      .filter(s => !commonWords.has(s));
+  };
+
+  // Lightweight company-name → ticker mapping for common prompts (e.g. "Analyze Apple")
+  const resolveCompanyMention = (message: string): string | null => {
+    const m = message.toLowerCase();
+    const map: Array<[RegExp, string]> = [
+      [/\bapple\b/, "AAPL"],
+      [/\bmicrosoft\b/, "MSFT"],
+      [/\bgoogle\b|\balphabet\b/, "GOOGL"],
+      [/\bnvidia\b/, "NVDA"],
+      [/\btesla\b/, "TSLA"],
+      [/\bamazon\b/, "AMZN"],
+      [/\bmeta\b|\bfacebook\b/, "META"],
+    ];
+    for (const [re, sym] of map) {
+      if (re.test(m)) return sym;
+    }
+    return null;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
-    
+
     // Extract symbols from the input and update the side panel
     const detectedSymbols = extractSymbols(input);
-    if (detectedSymbols.length > 0) {
-      onSymbolMentioned?.(detectedSymbols[0]);
-      sendMessage(input, detectedSymbols);
-    } else {
-      sendMessage(input);
+    const resolved = detectedSymbols[0] || resolveCompanyMention(input) || undefined;
+
+    if (resolved) {
+      onSymbolMentioned?.(resolved);
     }
-    
+
+    // Pass any detected symbols along to improve the coach's context
+    const symbolsForCoach = detectedSymbols.length > 0 ? detectedSymbols : (resolved ? [resolved] : undefined);
+    sendMessage(input, symbolsForCoach);
+
     setInput("");
-    
+
     // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";

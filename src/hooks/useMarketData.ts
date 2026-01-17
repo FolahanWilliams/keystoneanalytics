@@ -111,7 +111,10 @@ export function useCandles(symbol: string, timeframe: TimeframeType = "1D") {
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
 
-      const nextCandles: Candle[] = data?.candles || [];
+      const rawCandles: Candle[] = data?.candles || [];
+      // Normalize ordering: ensure candles are sorted oldest -> newest for consistent indicators/charts
+      const nextCandles = [...rawCandles].sort((a, b) => a.timestamp - b.timestamp);
+
       setCandles(nextCandles);
       hasRenderedDataRef.current = nextCandles.length > 0;
       candleCache.set(key, nextCandles);
