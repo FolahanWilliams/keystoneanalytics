@@ -108,11 +108,11 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const response = await supabase.functions.invoke("send-password-reset", {
-        body: { email, redirectTo: `${window.location.origin}/auth` },
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth`,
       });
 
-      if (response.error) throw new Error(response.error.message);
+      if (error) throw error;
 
       toast({
         title: "Check Your Email",
