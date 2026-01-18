@@ -31,7 +31,7 @@ const QUICK_ASKS = [
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/pulse-tutor`;
 
-export function PulseTutorChat() {
+export function KeystoneTutorChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -76,7 +76,7 @@ export function PulseTutorChat() {
         }
 
         if (!resp.ok || !resp.body) {
-          toast.error("Failed to connect to Pulse Tutor.");
+          toast.error("Failed to connect to Keystone Tutor.");
           setIsLoading(false);
           return;
         }
@@ -147,7 +147,7 @@ export function PulseTutorChat() {
           }
         }
       } catch (error) {
-        console.error("Pulse Tutor error:", error);
+        console.error("Keystone Tutor error:", error);
         toast.error("An error occurred. Please try again.");
       } finally {
         setIsLoading(false);
@@ -193,7 +193,7 @@ export function PulseTutorChat() {
             <GraduationCap className="w-4 h-4 text-primary" />
           </div>
           <div>
-            <span className="font-semibold text-sm">Pulse Tutor</span>
+            <span className="font-semibold text-sm">Keystone Tutor</span>
             <Badge variant="outline" className="ml-2 text-[10px] py-0">
               <Sparkles className="w-2.5 h-2.5 mr-1" />
               AI
@@ -220,7 +220,7 @@ export function PulseTutorChat() {
         {messages.length === 0 ? (
           <div className="text-center py-8">
             <GraduationCap className="w-12 h-12 mx-auto text-primary/50 mb-4" />
-            <h4 className="font-semibold mb-2">Welcome to Pulse Tutor</h4>
+            <h4 className="font-semibold mb-2">Welcome to Keystone Tutor</h4>
             <p className="text-sm text-muted-foreground mb-4">
               Your personal financial mentor. Ask me anything about investing, technical analysis,
               or market concepts.
@@ -294,7 +294,7 @@ export function PulseTutorChat() {
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask Pulse Tutor anything..."
+            placeholder="Ask Keystone Tutor anything..."
             disabled={isLoading}
             className="flex-1"
           />

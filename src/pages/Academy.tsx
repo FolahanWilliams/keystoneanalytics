@@ -14,7 +14,7 @@ import { useAcademyProgress } from "@/hooks/useAcademyProgress";
 import { LearningPathLevel } from "@/components/academy/LearningPathLevel";
 import { ModuleCard } from "@/components/academy/ModuleCard";
 import { ModuleDetailSheet } from "@/components/academy/ModuleDetailSheet";
-import { PulseTutorChat } from "@/components/academy/PulseTutorChat";
+import { KeystoneTutorChat } from "@/components/academy/KeystoneTutorChat";
 import { LevelQuiz } from "@/components/academy/LevelQuiz";
 import { AchievementBadges, type AchievementStats } from "@/components/academy/AchievementBadges";
 import { LEVELS, ALL_MODULES, TOTAL_MODULES } from "@/data/academy/levels";
@@ -221,7 +221,7 @@ export default function Academy() {
       </Dialog>
 
       {/* Floating AI Tutor */}
-      <PulseTutorChat />
+      <KeystoneTutorChat />
     </div>
   );
 }
