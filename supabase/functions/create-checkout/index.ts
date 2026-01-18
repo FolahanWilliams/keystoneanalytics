@@ -152,7 +152,7 @@ serve(async (req) => {
       }
     }
 
-    const origin = req.headers.get("origin") || "https://pulseterminal.lovable.app";
+    const origin = req.headers.get("origin") || "https://keystoneanalytics.org";
     
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
