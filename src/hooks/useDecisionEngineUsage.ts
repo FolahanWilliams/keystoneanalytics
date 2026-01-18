@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-const LOCAL_STORAGE_KEY = "pulse_decision_engine_usage";
+const LOCAL_STORAGE_KEY = "keystone_decision_engine_usage";
 const MAX_FREE_USES = 5;
 
 interface UsageData {
