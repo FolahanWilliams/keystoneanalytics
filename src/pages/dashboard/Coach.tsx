@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Brain, Lightbulb, ShieldCheck, Target, TrendingUp, BookOpen, Search } from "lucide-react";
 import { useVerdict } from "@/hooks/useVerdict";
-import { useTechnicalIndicators } from "@/hooks/useTechnicalIndicators";
 
 const FEATURED_STOCKS = [
   { symbol: "AAPL", name: "Apple Inc." },
@@ -33,13 +32,9 @@ const Coach = () => {
   const [activeSymbol, setActiveSymbol] = useState(initialSymbol || "AAPL");
   const [showSearch, setShowSearch] = useState(false);
   
-  // Get real technical indicators for the active symbol
-  const { indicators } = useTechnicalIndicators(activeSymbol);
-  
-  // Get verdict data using real technical indicators
+  // useVerdict now internally fetches technical indicators
   const { verdict, loading: verdictLoading } = useVerdict({ 
     symbol: activeSymbol,
-    marketData: indicators,
   });
 
   const handleSymbolSelect = (symbol: string) => {

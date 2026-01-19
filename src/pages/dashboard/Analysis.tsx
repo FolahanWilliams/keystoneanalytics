@@ -9,7 +9,6 @@ import { CompanyFundamentals } from "@/components/dashboard/CompanyFundamentals"
 import { BarChart3 } from "lucide-react";
 import { useQuotes } from "@/hooks/useMarketData";
 import { useVerdict } from "@/hooks/useVerdict";
-import { useTechnicalIndicators } from "@/hooks/useTechnicalIndicators";
 import { BentoModule, BentoGrid } from "@/components/ui/bento-module";
 import { motion } from "framer-motion";
 
@@ -18,11 +17,9 @@ const Analysis = () => {
   const { quotes } = useQuotes([selectedSymbol]);
   const quote = quotes[0];
   
-  const { indicators } = useTechnicalIndicators(selectedSymbol);
-  
+  // useVerdict now internally fetches technical indicators
   const { verdict, loading: verdictLoading } = useVerdict({ 
     symbol: selectedSymbol,
-    marketData: indicators,
   });
 
   const handleSymbolSelect = (symbol: string) => {
