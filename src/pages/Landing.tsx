@@ -111,26 +111,18 @@ const Landing = () => {
           <Sparkles className="w-3 h-3 text-primary" />
         </motion.div>
 
-        <motion.h1 
+        <h1 
           className="max-w-4xl text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
           style={{ letterSpacing: "-0.03em" }}
         >
           Professional Trading
           <span className="block mt-2 gradient-text">Intelligence Platform</span>
-        </motion.h1>
+        </h1>
 
-        <motion.p 
-          className="max-w-2xl mt-6 text-lg text-muted-foreground"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-        >
+        <p className="max-w-2xl mt-6 text-lg text-muted-foreground">
           Real-time market analysis, advanced charting, and intelligent insights. 
           Everything you need to make informed trading decisions.
-        </motion.p>
+        </p>
 
         <motion.div 
           className="flex flex-col gap-4 mt-10 sm:flex-row"
