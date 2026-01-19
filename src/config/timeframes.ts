@@ -11,8 +11,9 @@ export const timeframeConfig: Record<TimeframeType, { resolution: string; days: 
 
 // Extended timeframe for technical indicator calculations
 // Requires at least 250+ days for proper 200-day MA calculation
+// 200 days for SMA200 + 50 days warm-up buffer for Wilder's Smoothing (RSI)
 export const indicatorTimeframeConfig = {
   resolution: "D",
-  days: 365, // Full year of daily data for accurate long-term indicators
+  days: 400, // 400 days to ensure 200-day SMA accuracy + warm-up buffer
   label: "Technical Analysis",
 };

@@ -3,6 +3,11 @@ import type { Candle } from "@/types/market";
 // Technical indicator calculations - extracted for reuse
 
 export function calculateSMA(data: number[], period: number): (number | null)[] {
+  // Strict validation: return all nulls if insufficient data for even one valid calculation
+  if (data.length < period) {
+    return data.map(() => null);
+  }
+  
   return data.map((_, i) => {
     if (i < period - 1) return null;
     const slice = data.slice(i - period + 1, i + 1);
@@ -63,7 +68,10 @@ export function calculateBollingerBands(
 export function calculateRSI(data: number[], period: number = 14): (number | null)[] {
   const result: (number | null)[] = [];
 
-  if (data.length < period + 1) {
+  // Strict validation: need period + 1 data points minimum for first valid RSI
+  // Plus additional warm-up period (~50 days) for Wilder's smoothing to stabilize
+  const minimumRequired = period + 1;
+  if (data.length < minimumRequired) {
     return data.map(() => null);
   }
 
