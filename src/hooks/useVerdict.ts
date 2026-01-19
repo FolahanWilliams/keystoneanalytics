@@ -2,19 +2,10 @@ import { useMemo } from "react";
 import { calculateVerdictScore, VerdictResult, VerdictInput } from "@/utils/verdictEngine";
 import { useFredData } from "./useFredData";
 import { useFundamentals } from "./useFundamentals";
+import { useTechnicalIndicators } from "./useTechnicalIndicators";
 
 interface UseVerdictProps {
   symbol: string;
-  marketData?: {
-    price?: number;
-    ma200?: number;
-    ma50?: number;
-    rsi?: number;
-    macdSignal?: 'bullish' | 'bearish' | 'neutral';
-    volume?: number;
-    avgVolume?: number;
-    priceChange?: number;
-  };
   sentimentData?: {
     newsScore?: number;
     insiderActivity?: 'buying' | 'selling' | 'neutral';
@@ -22,15 +13,39 @@ interface UseVerdictProps {
   };
 }
 
-export function useVerdict({ symbol, marketData, sentimentData }: UseVerdictProps): {
+export function useVerdict({ symbol, sentimentData }: UseVerdictProps): {
   verdict: VerdictResult;
   loading: boolean;
   fundamentalsLoading: boolean;
+  indicatorsLoading: boolean;
+  dataQuality: 'full' | 'partial' | 'insufficient' | undefined;
 } {
   const { analysis } = useFredData();
   const { data: fundamentals, loading: fundamentalsLoading } = useFundamentals(symbol);
+  const { indicators, loading: indicatorsLoading } = useTechnicalIndicators(symbol);
 
   const verdict = useMemo(() => {
+    // Validate market data - log warnings for missing critical indicators
+    const hasMA200 = indicators.ma200 !== undefined;
+    const hasMA50 = indicators.ma50 !== undefined;
+    const hasRSI = indicators.rsi !== undefined;
+    
+    if (!hasMA200 && indicators.dataQuality !== 'insufficient') {
+      console.warn(`[Verdict] Missing 200-day MA for ${symbol} - insufficient historical data`);
+    }
+    
+    // Build market data input with validated indicators
+    const marketData = {
+      price: indicators.price,
+      ma200: indicators.ma200,
+      ma50: indicators.ma50,
+      rsi: indicators.rsi,
+      macdSignal: indicators.macdSignal,
+      volume: indicators.volume,
+      avgVolume: indicators.avgVolume,
+      priceChange: indicators.priceChange,
+    };
+
     const input: VerdictInput = {
       market: marketData,
       fundamental: fundamentals ? {
@@ -54,14 +69,18 @@ export function useVerdict({ symbol, marketData, sentimentData }: UseVerdictProp
         sectorRotation: analysis?.riskSentiment?.includes('risk-on') ? 'risk_on'
           : analysis?.riskSentiment?.includes('risk-off') ? 'risk_off' : 'neutral',
       },
+      // Pass data quality for confidence adjustment
+      dataQuality: indicators.dataQuality,
     };
 
     return calculateVerdictScore(input);
-  }, [symbol, marketData, fundamentals, sentimentData, analysis]);
+  }, [symbol, indicators, fundamentals, sentimentData, analysis]);
 
   return {
     verdict,
-    loading: false,
+    loading: indicatorsLoading,
     fundamentalsLoading,
+    indicatorsLoading,
+    dataQuality: indicators.dataQuality,
   };
 }

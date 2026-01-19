@@ -8,3 +8,11 @@ export const timeframeConfig: Record<TimeframeType, { resolution: string; days: 
   "1W": { resolution: "W", days: 365, label: "Weekly" },
   "1M": { resolution: "M", days: 730, label: "Monthly" },
 };
+
+// Extended timeframe for technical indicator calculations
+// Requires at least 250+ days for proper 200-day MA calculation
+export const indicatorTimeframeConfig = {
+  resolution: "D",
+  days: 365, // Full year of daily data for accurate long-term indicators
+  label: "Technical Analysis",
+};

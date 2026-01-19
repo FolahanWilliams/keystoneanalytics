@@ -80,6 +80,7 @@ export interface VerdictInput {
   fundamental?: FundamentalData;
   sentiment?: SentimentData;
   macro?: MacroData;
+  dataQuality?: 'full' | 'partial' | 'insufficient';
 }
 
 function calculateTechnicalMetrics(data: MarketData): VerdictMetric[] {
@@ -600,9 +601,16 @@ export function calculateVerdictScore(input: VerdictInput): VerdictResult {
     .sort((a, b) => (b.strength * b.weight) - (a.strength * a.weight))
     .slice(0, 3);
 
-  // Calculate confidence based on data availability
+  // Calculate confidence based on data availability and quality
   const expectedMetrics = 15; // Total expected metrics
-  const confidence = Math.min(100, (allMetrics.length / expectedMetrics) * 100);
+  let confidence = Math.min(100, (allMetrics.length / expectedMetrics) * 100);
+  
+  // Reduce confidence if data quality is not full
+  if (input.dataQuality === 'partial') {
+    confidence = Math.min(confidence, 70); // Cap at 70% for partial data
+  } else if (input.dataQuality === 'insufficient') {
+    confidence = Math.min(confidence, 40); // Cap at 40% for insufficient data
+  }
 
   return {
     score: Math.round(compositeScore),
