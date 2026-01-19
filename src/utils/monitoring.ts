@@ -38,6 +38,15 @@ function getRating(name: MetricName, value: number): 'good' | 'needs-improvement
   return 'poor';
 }
 
+// Defer non-critical work to avoid blocking initial render
+function deferWork(callback: () => void) {
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(callback, { timeout: 5000 });
+  } else {
+    setTimeout(callback, 2000);
+  }
+}
+
 async function sendMetric(type: 'error' | 'performance' | 'event', name: string, value: object) {
   // Only send in production
   if (import.meta.env.DEV) {
@@ -45,22 +54,25 @@ async function sendMetric(type: 'error' | 'performance' | 'event', name: string,
     return;
   }
 
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    // Use raw insert - types will be regenerated
-    await supabase.from('app_metrics' as any).insert({
-      type,
-      name,
-      value,
-      user_id: user?.id || null,
-      url: window.location.href,
-      user_agent: navigator.userAgent,
-    });
-  } catch (error) {
-    // Silent fail - don't break the app for monitoring
-    console.warn('[Monitoring] Failed to send metric:', error);
-  }
+  // Defer API calls to avoid blocking critical path
+  deferWork(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Use raw insert - types will be regenerated
+      await supabase.from('app_metrics' as any).insert({
+        type,
+        name,
+        value,
+        user_id: user?.id || null,
+        url: window.location.href,
+        user_agent: navigator.userAgent,
+      });
+    } catch (error) {
+      // Silent fail - don't break the app for monitoring
+      console.warn('[Monitoring] Failed to send metric:', error);
+    }
+  });
 }
 
 export function reportError(error: Error, componentStack?: string) {
