@@ -2,12 +2,11 @@ import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   calculateSMA, 
-  calculateEMA, 
   calculateRSI, 
   calculateMACD 
 } from "@/utils/technicalIndicators";
 import { indicatorTimeframeConfig } from "@/config/timeframes";
-import { DataCache, cacheKey } from "@/utils/cache";
+import { marketDataCache, cacheKey } from "@/utils/cache";
 import type { Candle } from "@/types/market";
 
 export interface TechnicalIndicators {
@@ -47,13 +46,11 @@ function calculateAvgVolume(candles: Candle[], period: number = 20): number {
   return recentCandles.reduce((sum, c) => sum + c.volume, 0) / period;
 }
 
-// Dedicated cache for technical indicator data (365 days)
-const technicalDataCache = new DataCache<Candle[]>(120_000); // 2 minute cache
-
 export function useTechnicalIndicators(symbol: string): {
   indicators: TechnicalIndicators;
   loading: boolean;
   error: string | null;
+  refetch: () => void;
 } {
   const [candles, setCandles] = useState<Candle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,10 +66,10 @@ export function useTechnicalIndicators(symbol: string): {
     }
 
     const mySeq = ++requestSeq.current;
-    const key = cacheKey(symbol, 'TECH');
-    const cached = technicalDataCache.get(key);
+    const key = cacheKey('technical', symbol);
+    const cached = marketDataCache.getTechnical(key);
 
-    if (technicalDataCache.isFresh(key) && cached) {
+    if (marketDataCache.isTechnicalFresh(key) && cached) {
       setCandles(cached);
       setLoading(false);
       return;
@@ -100,7 +97,7 @@ export function useTechnicalIndicators(symbol: string): {
       const sortedCandles = [...rawCandles].sort((a, b) => a.timestamp - b.timestamp);
 
       setCandles(sortedCandles);
-      technicalDataCache.set(key, sortedCandles);
+      marketDataCache.setTechnical(key, sortedCandles);
     } catch (err) {
       if (requestSeq.current !== mySeq) return;
       console.error("Error fetching technical data:", err);
@@ -109,6 +106,12 @@ export function useTechnicalIndicators(symbol: string): {
       if (requestSeq.current === mySeq) setLoading(false);
     }
   }, [symbol]);
+
+  // Refetch function that clears cache first
+  const refetch = useCallback(() => {
+    marketDataCache.invalidateSymbol(symbol);
+    fetchTechnicalData();
+  }, [symbol, fetchTechnicalData]);
 
   useEffect(() => {
     fetchTechnicalData();
@@ -225,5 +228,6 @@ export function useTechnicalIndicators(symbol: string): {
     indicators,
     loading,
     error,
+    refetch,
   };
 }

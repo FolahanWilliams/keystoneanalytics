@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Quote, Candle, SearchResult, TimeframeType } from "@/types/market";
 import { timeframeConfig } from "@/config/timeframes";
-import { DataCache, cacheKey } from "@/utils/cache";
+import { marketDataCache, cacheKey } from "@/utils/cache";
 
 // Re-export types for backward compatibility
 export type { Quote, Candle, SearchResult, TimeframeType };
@@ -22,6 +22,15 @@ export function useQuotes(symbols: string[]) {
     }
 
     const mySeq = ++requestSeq.current;
+    const key = cacheKey('quotes', ...symbols);
+
+    // Check unified cache first
+    const cached = marketDataCache.getQuotes(key);
+    if (marketDataCache.isQuotesFresh(key) && cached) {
+      setQuotes(cached);
+      setLoading(false);
+      return;
+    }
 
     try {
       setError(null);
@@ -34,7 +43,9 @@ export function useQuotes(symbols: string[]) {
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
 
-      setQuotes(data?.quotes || []);
+      const nextQuotes = data?.quotes || [];
+      setQuotes(nextQuotes);
+      marketDataCache.setQuotes(key, nextQuotes);
     } catch (err) {
       if (requestSeq.current !== mySeq) return;
       console.error("Error fetching quotes:", err);
@@ -52,9 +63,6 @@ export function useQuotes(symbols: string[]) {
 
   return { quotes, loading, error, refetch: fetchQuotes };
 }
-
-// Client-side cache for candle data
-const candleCache = new DataCache<Candle[]>(60_000);
 
 export function useCandles(symbol: string, timeframe: TimeframeType = "1D") {
   const [candles, setCandles] = useState<Candle[]>([]);
@@ -77,10 +85,10 @@ export function useCandles(symbol: string, timeframe: TimeframeType = "1D") {
 
     const mySeq = ++requestSeq.current;
     const config = timeframeConfig[timeframe];
-    const key = cacheKey(symbol, timeframe);
+    const key = cacheKey('candles', symbol, timeframe);
 
-    const cached = candleCache.get(key);
-    const cacheFresh = candleCache.isFresh(key);
+    const cached = marketDataCache.getCandles(key);
+    const cacheFresh = marketDataCache.isCandlesFresh(key);
 
     if (lastKeyRef.current !== key && !cacheFresh) {
       setCandles([]);
@@ -117,7 +125,7 @@ export function useCandles(symbol: string, timeframe: TimeframeType = "1D") {
 
       setCandles(nextCandles);
       hasRenderedDataRef.current = nextCandles.length > 0;
-      candleCache.set(key, nextCandles);
+      marketDataCache.setCandles(key, nextCandles);
     } catch (err) {
       if (requestSeq.current !== mySeq) return;
       console.error("Error fetching candles:", err);
