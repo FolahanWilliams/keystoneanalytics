@@ -20,7 +20,7 @@ export function useVerdict({ symbol, sentimentData }: UseVerdictProps): {
   indicatorsLoading: boolean;
   dataQuality: 'full' | 'partial' | 'insufficient' | undefined;
 } {
-  const { analysis } = useFredData();
+  const { analysis, vixLevel } = useFredData();
   const { data: fundamentals, loading: fundamentalsLoading } = useFundamentals(symbol);
   const { indicators, loading: indicatorsLoading } = useTechnicalIndicators(symbol);
 
@@ -46,6 +46,19 @@ export function useVerdict({ symbol, sentimentData }: UseVerdictProps): {
       priceChange: indicators.priceChange,
     };
 
+    // Determine rate trend from analysis
+    // The edge function now returns rateTrend directly, but fallback to parsing rateEnvironment
+    let interestRateTrend: 'rising' | 'falling' | 'stable' = 'stable';
+    if (analysis?.rateTrend) {
+      interestRateTrend = analysis.rateTrend;
+    } else if (analysis?.rateEnvironment) {
+      if (analysis.rateEnvironment.includes('rising') || analysis.rateEnvironment === 'restrictive') {
+        interestRateTrend = 'rising';
+      } else if (analysis.rateEnvironment.includes('falling') || analysis.rateEnvironment === 'accommodative') {
+        interestRateTrend = 'falling';
+      }
+    }
+
     const input: VerdictInput = {
       market: marketData,
       fundamental: fundamentals ? {
@@ -62,9 +75,8 @@ export function useVerdict({ symbol, sentimentData }: UseVerdictProps): {
         analystRating: fundamentals?.analystRating ?? undefined,
       },
       macro: {
-        vix: 18, // Default VIX - could be fetched from API
-        interestRateTrend: analysis?.rateEnvironment?.includes('rising') ? 'rising' 
-          : analysis?.rateEnvironment?.includes('falling') ? 'falling' : 'stable',
+        vix: vixLevel ?? 18, // Use live VIX, fallback to 18 if unavailable
+        interestRateTrend,
         yieldCurve: analysis?.recessionSignal ? 'inverted' : 'normal',
         sectorRotation: analysis?.riskSentiment?.includes('risk-on') ? 'risk_on'
           : analysis?.riskSentiment?.includes('risk-off') ? 'risk_off' : 'neutral',
@@ -74,7 +86,7 @@ export function useVerdict({ symbol, sentimentData }: UseVerdictProps): {
     };
 
     return calculateVerdictScore(input);
-  }, [symbol, indicators, fundamentals, sentimentData, analysis]);
+  }, [symbol, indicators, fundamentals, sentimentData, analysis, vixLevel]);
 
   return {
     verdict,

@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useQuotes } from "@/hooks/useMarketData";
 import { useTechnicalIndicators } from "@/hooks/useTechnicalIndicators";
+import { marketDataCache } from "@/utils/cache";
 
 interface MarketDataPanelProps {
   symbol: string;
@@ -14,7 +15,7 @@ interface MarketDataPanelProps {
 
 export function MarketDataPanel({ symbol, onSymbolChange }: MarketDataPanelProps) {
   const { quotes, loading: quotesLoading, refetch: refetchQuotes } = useQuotes([symbol]);
-  const { indicators, loading: indicatorsLoading, error: indicatorsError } = useTechnicalIndicators(symbol);
+  const { indicators, loading: indicatorsLoading, error: indicatorsError, refetch: refetchIndicators } = useTechnicalIndicators(symbol);
   
   const quote = quotes[0];
   const isLoading = quotesLoading || indicatorsLoading;
@@ -24,7 +25,10 @@ export function MarketDataPanel({ symbol, onSymbolChange }: MarketDataPanelProps
   const hasValidIndicators = dataQuality !== 'insufficient' && indicators.ma20 !== undefined;
 
   const handleRefresh = () => {
+    // Global cache flush for this symbol - ensures consistency across all app layers
+    marketDataCache.invalidateSymbol(symbol);
     refetchQuotes();
+    refetchIndicators();
   };
 
   const isPositive = quote && quote.change >= 0;

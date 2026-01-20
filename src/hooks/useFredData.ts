@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface FredIndicator {
@@ -15,6 +15,7 @@ export interface FredIndicator {
 
 export interface MarketAnalysis {
   rateEnvironment: string;
+  rateTrend?: 'rising' | 'falling' | 'stable';
   inflationOutlook: string;
   laborMarket: string;
   riskSentiment: string;
@@ -56,5 +57,11 @@ export function useFredData(category?: string) {
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  return { indicators, analysis, loading, error, refetch: fetchData };
+  // Extract VIX level from indicators for direct consumption
+  const vixLevel = useMemo(() => {
+    const vixIndicator = indicators.find(i => i.id === 'VIXCLS');
+    return vixIndicator?.value;
+  }, [indicators]);
+
+  return { indicators, analysis, vixLevel, loading, error, refetch: fetchData };
 }

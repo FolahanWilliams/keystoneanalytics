@@ -128,6 +128,7 @@ serve(async (req) => {
 function generateMarketAnalysis(indicators: any[]) {
   const analysis: any = {
     rateEnvironment: 'neutral',
+    rateTrend: 'stable', // Explicit rate trend for verdict engine
     inflationOutlook: 'stable',
     laborMarket: 'healthy',
     riskSentiment: 'neutral',
@@ -139,10 +140,23 @@ function generateMarketAnalysis(indicators: any[]) {
   const vix = indicators.find(i => i?.id === 'VIXCLS');
   const unemployment = indicators.find(i => i?.id === 'UNRATE');
 
-  // Rate environment
+  // Rate environment and explicit rate trend
   if (fedFunds) {
-    if (fedFunds.value > 5) analysis.rateEnvironment = 'restrictive';
-    else if (fedFunds.value < 2) analysis.rateEnvironment = 'accommodative';
+    // Set rate trend based on recent changes
+    if (fedFunds.trend === 'up') {
+      analysis.rateTrend = 'rising';
+    } else if (fedFunds.trend === 'down') {
+      analysis.rateTrend = 'falling';
+    } else {
+      analysis.rateTrend = 'stable';
+    }
+    
+    // Set rate environment based on level
+    if (fedFunds.value > 5) {
+      analysis.rateEnvironment = 'restrictive';
+    } else if (fedFunds.value < 2) {
+      analysis.rateEnvironment = 'accommodative';
+    }
   }
 
   // Yield curve
@@ -154,10 +168,13 @@ function generateMarketAnalysis(indicators: any[]) {
     analysis.recessionSignal = false;
   }
 
-  // Risk sentiment
+  // Risk sentiment based on VIX
   if (vix) {
-    if (vix.value > 25) analysis.riskSentiment = 'fearful';
-    else if (vix.value < 15) analysis.riskSentiment = 'complacent';
+    if (vix.value > 25) {
+      analysis.riskSentiment = 'risk-off'; // Aligned with verdict engine expectations
+    } else if (vix.value < 15) {
+      analysis.riskSentiment = 'risk-on';
+    }
   }
 
   // Labor market
@@ -171,10 +188,15 @@ function generateMarketAnalysis(indicators: any[]) {
   if (analysis.rateEnvironment === 'restrictive') {
     summaryParts.push('Fed maintains restrictive stance');
   }
+  if (analysis.rateTrend === 'rising') {
+    summaryParts.push('Interest rates trending higher');
+  } else if (analysis.rateTrend === 'falling') {
+    summaryParts.push('Interest rates trending lower');
+  }
   if (analysis.recessionSignal) {
     summaryParts.push('Yield curve inverted (recession indicator)');
   }
-  if (analysis.riskSentiment === 'fearful') {
+  if (analysis.riskSentiment === 'risk-off') {
     summaryParts.push('Elevated market fear (VIX high)');
   }
   if (analysis.laborMarket === 'tight') {
