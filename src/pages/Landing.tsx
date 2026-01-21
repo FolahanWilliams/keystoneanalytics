@@ -11,7 +11,6 @@ import {
   Sparkles
 } from "lucide-react";
 import { MobileNav } from "@/components/layout/MobileNav";
-import { motion } from "framer-motion";
 
 const navItems = [
   { label: "Academy", href: "/academy" },
@@ -98,18 +97,16 @@ const Landing = () => {
         <MobileNav items={navItems} />
       </nav>
 
-      {/* Hero Section */}
+      {/* Hero Section - Using CSS animations instead of framer-motion whileInView */}
       <main className="relative z-10 flex flex-col items-center justify-center px-6 pt-24 pb-32 text-center lg:pt-32">
-        <motion.div 
-          className="inline-flex items-center gap-2 px-4 py-2 mb-8 text-sm border rounded-full bg-card/50 border-border text-muted-foreground"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        <div 
+          className="inline-flex items-center gap-2 px-4 py-2 mb-8 text-sm border rounded-full bg-card/50 border-border text-muted-foreground animate-fade-in-up"
+          style={{ animationDelay: '0ms' }}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
           <span className="text-xs font-medium">Live Market Data</span>
           <Sparkles className="w-3 h-3 text-primary" />
-        </motion.div>
+        </div>
 
         <h1 
           className="max-w-4xl text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl"
@@ -124,11 +121,9 @@ const Landing = () => {
           Everything you need to make informed trading decisions.
         </p>
 
-        <motion.div 
-          className="flex flex-col gap-4 mt-10 sm:flex-row"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        <div 
+          className="flex flex-col gap-4 mt-10 sm:flex-row animate-fade-in-up"
+          style={{ animationDelay: '200ms' }}
         >
           <Link to="/auth">
             <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2 px-8 h-12 text-base">
@@ -140,39 +135,32 @@ const Landing = () => {
               View Pricing
             </Button>
           </Link>
-        </motion.div>
+        </div>
       </main>
 
-      {/* Features Section */}
+      {/* Features Section - Using CSS scroll-triggered animations */}
       <section className="relative z-10 px-6 py-24 lg:px-12">
         <div className="max-w-6xl mx-auto">
-          <motion.h2 
-            className="text-3xl font-bold text-center mb-16"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            style={{ letterSpacing: "-0.02em" }}
+          <h2 
+            className="text-3xl font-bold text-center mb-16 animate-fade-in-up"
+            style={{ letterSpacing: "-0.02em", animationDelay: '100ms' }}
           >
             Powerful Features for <span className="text-primary">Professional Traders</span>
-          </motion.h2>
+          </h2>
           
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {features.map((feature, i) => (
-              <motion.div
+              <div
                 key={feature.title}
-                className="group p-6 rounded-2xl bento-module"
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: i * 0.1 }}
+                className="group p-6 rounded-2xl bento-module animate-fade-in-up"
+                style={{ animationDelay: `${150 + i * 75}ms` }}
               >
                 <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/15 transition-colors">
                   <feature.icon className="w-5 h-5 text-primary" />
                 </div>
                 <h3 className="text-base font-semibold mb-2">{feature.title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
@@ -180,12 +168,9 @@ const Landing = () => {
 
       {/* CTA Section */}
       <section className="relative z-10 px-6 py-24 lg:px-12">
-        <motion.div 
-          className="max-w-4xl mx-auto text-center bento-module p-12"
-          initial={{ opacity: 0, scale: 0.98 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
+        <div 
+          className="max-w-4xl mx-auto text-center bento-module p-12 animate-fade-in-up"
+          style={{ animationDelay: '300ms' }}
         >
           <h2 className="text-3xl font-bold mb-4" style={{ letterSpacing: "-0.02em" }}>
             Ready to Trade Smarter?
@@ -198,7 +183,7 @@ const Landing = () => {
               Start Trading Now <ChevronRight className="w-5 h-5" />
             </Button>
           </Link>
-        </motion.div>
+        </div>
       </section>
 
       {/* Footer */}
