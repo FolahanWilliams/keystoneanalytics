@@ -58,6 +58,43 @@ const ChartContainer = React.forwardRef<
 });
 ChartContainer.displayName = "Chart";
 
+// Validates CSS color values to prevent injection attacks
+// Accepts: hex (#fff, #ffffff), rgb/rgba, hsl/hsla, and CSS color keywords
+const isValidCSSColor = (color: string): boolean => {
+  if (!color || typeof color !== 'string') return false;
+  
+  const sanitized = color.trim().toLowerCase();
+  
+  // Hex colors: #fff, #ffffff, #ffffffff
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(sanitized)) return true;
+  
+  // RGB/RGBA: rgb(0, 0, 0), rgba(0, 0, 0, 0.5)
+  if (/^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,\s*(0|1|0?\.\d+))?\s*\)$/.test(sanitized)) return true;
+  
+  // HSL/HSLA: hsl(0, 0%, 0%), hsla(0, 0%, 0%, 0.5)
+  if (/^hsla?\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%\s*(,\s*(0|1|0?\.\d+))?\s*\)$/.test(sanitized)) return true;
+  
+  // Modern HSL/HSLA syntax: hsl(0 0% 0%), hsl(0 0% 0% / 0.5)
+  if (/^hsla?\(\s*[\d.]+\s+[\d.]+%\s+[\d.]+%(\s*\/\s*(0|1|0?\.\d+))?\s*\)$/.test(sanitized)) return true;
+  
+  // CSS color keywords (common ones used in charts)
+  const validKeywords = [
+    'transparent', 'currentcolor', 'inherit', 'initial', 'unset',
+    'black', 'white', 'red', 'green', 'blue', 'yellow', 'orange', 'purple',
+    'gray', 'grey', 'pink', 'brown', 'cyan', 'magenta'
+  ];
+  if (validKeywords.includes(sanitized)) return true;
+  
+  return false;
+};
+
+// Sanitizes CSS property keys to prevent injection
+const isValidCSSKey = (key: string): boolean => {
+  if (!key || typeof key !== 'string') return false;
+  // Only allow alphanumeric characters, hyphens, and underscores
+  return /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(key);
+};
+
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(([_, config]) => config.theme || config.color);
 
@@ -74,9 +111,17 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
 ${prefix} [data-chart=${id}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
+    // Validate key to prevent CSS injection
+    if (!isValidCSSKey(key)) return null;
+    
     const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
+    
+    // Validate color value before injection
+    if (!color || !isValidCSSColor(color)) return null;
+    
+    return `  --color-${key}: ${color};`;
   })
+  .filter(Boolean)
   .join("\n")}
 }
 `,
