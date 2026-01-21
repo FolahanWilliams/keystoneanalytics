@@ -66,18 +66,53 @@ serve(async (req) => {
       );
     }
 
-    const { series, category } = await req.json();
+    const body = await req.json();
     const apiKey = Deno.env.get('FRED_API_KEY');
 
     if (!apiKey) {
       throw new Error('FRED API key not configured');
     }
 
+    // Input validation
+    const ALLOWED_CATEGORIES = ['rates', 'inflation', 'employment', 'growth', 'sentiment', 'money'];
+    const SERIES_ID_REGEX = /^[A-Z0-9_]{1,50}$/;
+    const MAX_SERIES_COUNT = 50;
+
+    const { series, category } = body;
+
+    // Validate category if provided
+    if (category && !ALLOWED_CATEGORIES.includes(category)) {
+      return new Response(
+        JSON.stringify({ error: `Invalid category. Allowed: ${ALLOWED_CATEGORIES.join(', ')}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Determine which series to fetch
     let seriesToFetch: string[] = [];
     
     if (series) {
-      seriesToFetch = Array.isArray(series) ? series : [series];
+      const seriesArray = Array.isArray(series) ? series : [series];
+      
+      // Validate array length
+      if (seriesArray.length > MAX_SERIES_COUNT) {
+        return new Response(
+          JSON.stringify({ error: `Too many series requested. Maximum: ${MAX_SERIES_COUNT}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Validate each series ID format
+      for (const id of seriesArray) {
+        if (typeof id !== 'string' || !SERIES_ID_REGEX.test(id)) {
+          return new Response(
+            JSON.stringify({ error: `Invalid series ID: ${id}. Must be 1-50 uppercase alphanumeric characters.` }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+      
+      seriesToFetch = seriesArray;
     } else if (category) {
       seriesToFetch = Object.entries(INDICATORS)
         .filter(([_, info]) => info.category === category)
