@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface Message {
   id: string;
@@ -60,6 +61,15 @@ export function useStockCoach(options: UseStockCoachOptions = {}) {
     ]);
 
     try {
+      // Get user session token for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        options.onError?.("Authentication required. Please sign in to use the stock coach.");
+        setMessages(prev => prev.filter(m => m.id !== assistantId));
+        setIsLoading(false);
+        return;
+      }
+
       const allMessages = [...messages, userMessage].map(m => ({
         role: m.role,
         content: m.content,
@@ -69,7 +79,7 @@ export function useStockCoach(options: UseStockCoachOptions = {}) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ 
           messages: allMessages,
