@@ -60,6 +60,9 @@ export interface FundamentalsData {
   // Metadata
   lastUpdated: string;
   dataSource: string;
+  
+  // Premium field locking (added by backend paywall)
+  _premiumLocked?: string[];
 }
 
 // In-memory cache for fundamentals
@@ -70,6 +73,7 @@ export function useFundamentals(symbol: string | null) {
   const [data, setData] = useState<FundamentalsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [premiumLocked, setPremiumLocked] = useState<string[]>([]);
 
   const fetchFundamentals = useCallback(async (sym: string) => {
     const upperSymbol = sym.toUpperCase();
@@ -95,6 +99,14 @@ export function useFundamentals(symbol: string | null) {
 
       const fundamentals = result.fundamentals as FundamentalsData;
       
+      // Track which fields are locked by backend paywall
+      if (fundamentals._premiumLocked && fundamentals._premiumLocked.length > 0) {
+        setPremiumLocked(fundamentals._premiumLocked);
+        console.log(`[Fundamentals] Premium fields locked for ${upperSymbol}:`, fundamentals._premiumLocked);
+      } else {
+        setPremiumLocked([]);
+      }
+      
       // Update cache
       cache.set(upperSymbol, { data: fundamentals, timestamp: Date.now() });
       
@@ -103,6 +115,7 @@ export function useFundamentals(symbol: string | null) {
       console.error("Error fetching fundamentals:", err);
       setError(err instanceof Error ? err.message : "Failed to fetch fundamentals");
       setData(null);
+      setPremiumLocked([]);
     } finally {
       setLoading(false);
     }
@@ -114,6 +127,7 @@ export function useFundamentals(symbol: string | null) {
     } else {
       setData(null);
       setError(null);
+      setPremiumLocked([]);
     }
   }, [symbol, fetchFundamentals]);
 
@@ -125,5 +139,10 @@ export function useFundamentals(symbol: string | null) {
     }
   }, [symbol, fetchFundamentals]);
 
-  return { data, loading, error, refetch };
+  // Helper to check if a specific field is locked
+  const isFieldLocked = useCallback((field: string) => {
+    return premiumLocked.includes(field);
+  }, [premiumLocked]);
+
+  return { data, loading, error, refetch, premiumLocked, isFieldLocked };
 }

@@ -21,8 +21,11 @@ export function useVerdict({ symbol, sentimentData }: UseVerdictProps): {
   dataQuality: 'full' | 'partial' | 'insufficient' | undefined;
 } {
   const { analysis, vixLevel } = useFredData();
-  const { data: fundamentals, loading: fundamentalsLoading } = useFundamentals(symbol);
+  const { data: fundamentals, loading: fundamentalsLoading, premiumLocked } = useFundamentals(symbol);
   const { indicators, loading: indicatorsLoading } = useTechnicalIndicators(symbol);
+
+  // Check if fundamental data is partially locked by paywall
+  const fundamentalsLocked = premiumLocked.length > 0;
 
   const verdict = useMemo(() => {
     // Validate market data - log warnings for missing critical indicators
@@ -82,11 +85,14 @@ export function useVerdict({ symbol, sentimentData }: UseVerdictProps): {
           : analysis?.riskSentiment?.includes('risk-off') ? 'risk_off' : 'neutral',
       },
       // Pass data quality for confidence adjustment
-      dataQuality: indicators.dataQuality,
+      // Reduce quality if fundamentals are locked by paywall
+      dataQuality: fundamentalsLocked 
+        ? (indicators.dataQuality === 'full' ? 'partial' : indicators.dataQuality)
+        : indicators.dataQuality,
     };
 
     return calculateVerdictScore(input);
-  }, [symbol, indicators, fundamentals, sentimentData, analysis, vixLevel]);
+  }, [symbol, indicators, fundamentals, sentimentData, analysis, vixLevel, fundamentalsLocked]);
 
   return {
     verdict,
