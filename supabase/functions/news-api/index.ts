@@ -36,11 +36,35 @@ serve(async (req) => {
       );
     }
 
-    const { query, category, pageSize = 10 } = await req.json();
+    const body = await req.json();
     const apiKey = Deno.env.get('NEWSAPI_KEY');
 
     if (!apiKey) {
       throw new Error('NewsAPI key not configured');
+    }
+
+    // Input validation
+    const ALLOWED_CATEGORIES = ['business', 'technology', 'entertainment', 'general', 'health', 'science', 'sports'];
+    
+    // Validate and sanitize pageSize (1-100, default 10)
+    const pageSize = Math.min(Math.max(1, parseInt(body.pageSize) || 10), 100);
+    
+    // Validate query length
+    const query = body.query;
+    if (query && (typeof query !== 'string' || query.length > 500)) {
+      return new Response(
+        JSON.stringify({ error: 'Query must be a string with max 500 characters' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Validate category
+    const category = body.category;
+    if (category && !ALLOWED_CATEGORIES.includes(category)) {
+      return new Response(
+        JSON.stringify({ error: `Invalid category. Allowed: ${ALLOWED_CATEGORIES.join(', ')}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     let url: string;

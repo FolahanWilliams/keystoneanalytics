@@ -55,11 +55,32 @@ serve(async (req) => {
       );
     }
 
-    const { symbol, companyName } = await req.json();
+    const body = await req.json();
+    const { symbol, companyName } = body;
+
+    // Input validation
+    const SYMBOL_REGEX = /^[A-Z0-9.]{1,10}$/;
+    const COMPANY_NAME_REGEX = /^[a-zA-Z0-9\s&.,'-]{1,100}$/;
 
     if (!symbol) {
       return new Response(
         JSON.stringify({ success: false, error: 'Symbol is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate symbol format
+    if (typeof symbol !== 'string' || !SYMBOL_REGEX.test(symbol)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid symbol format. Must be 1-10 uppercase alphanumeric characters.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate companyName if provided
+    if (companyName && (typeof companyName !== 'string' || !COMPANY_NAME_REGEX.test(companyName))) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid company name. Max 100 characters, alphanumeric and basic punctuation only.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
