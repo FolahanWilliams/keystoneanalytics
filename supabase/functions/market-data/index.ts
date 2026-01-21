@@ -1,5 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { 
+  getUserTier, 
+  getUserIdFromAuth,
+  maskQuoteFields,
+  maskPremiumFields,
+  PREMIUM_FUNDAMENTAL_FIELDS,
+  type SubscriptionTier 
+} from "../_shared/tierCheck.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -174,23 +182,15 @@ serve(async (req) => {
   }
 
   try {
-    // Authentication is optional for market data - allow public access for viewing
+    // Get user auth and tier for paywall enforcement
     const authHeader = req.headers.get("Authorization");
-    let isAuthenticated = false;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    
+    const userId = await getUserIdFromAuth(authHeader, supabaseUrl, anonKey);
+    const tier: SubscriptionTier = userId ? await getUserTier(userId) : 'free';
 
-    if (authHeader?.startsWith("Bearer ")) {
-      const supabaseClient = createClient(
-        Deno.env.get("SUPABASE_URL") ?? "",
-        Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-        { global: { headers: { Authorization: authHeader } } }
-      );
-
-      const token = authHeader.replace("Bearer ", "");
-      const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-      isAuthenticated = !claimsError && !!claimsData?.claims;
-    }
-
-    console.log(`Market data request - authenticated: ${isAuthenticated}`);
+    console.log(`Market data request - userId: ${userId}, tier: ${tier}`);
 
     const { symbols, type, resolution, days } = await req.json();
 
@@ -290,7 +290,10 @@ serve(async (req) => {
         })
       );
 
-      return new Response(JSON.stringify({ quotes }), {
+      // Apply tier-based masking to premium quote fields
+      const maskedQuotes = quotes.map(q => maskQuoteFields(q, tier));
+
+      return new Response(JSON.stringify({ quotes: maskedQuotes }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -352,9 +355,16 @@ serve(async (req) => {
           website: profile.website,
         };
 
-        console.log(`FMP fundamentals for ${symbol}: ${profile.companyName}`);
+        console.log(`FMP fundamentals for ${symbol}: ${profile.companyName}, tier=${tier}`);
 
-        return new Response(JSON.stringify({ fundamentals }), {
+        // Apply tier-based masking to premium fundamental fields
+        const maskedFundamentals = maskPremiumFields(
+          fundamentals,
+          tier,
+          PREMIUM_FUNDAMENTAL_FIELDS
+        );
+
+        return new Response(JSON.stringify({ fundamentals: maskedFundamentals }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } catch (error) {

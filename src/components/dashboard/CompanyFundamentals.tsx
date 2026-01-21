@@ -9,30 +9,10 @@ import {
   BarChart3,
   Percent,
   Calendar,
-  Globe
+  Globe,
+  Lock
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-
-interface FundamentalsData {
-  symbol: string;
-  companyName: string;
-  sector: string;
-  industry: string;
-  marketCap: number;
-  pe: number;
-  eps: number;
-  revenue: number;
-  netIncome: number;
-  profitMargin: number;
-  beta: number;
-  dividendYield: number;
-  employees: number;
-  exchange: string;
-  country: string;
-  description: string;
-  website: string;
-}
+import { useFundamentals } from "@/hooks/useFundamentals";
 
 interface CompanyFundamentalsProps {
   symbol: string;
@@ -55,12 +35,14 @@ const StatItem = ({
   icon: Icon, 
   label, 
   value, 
-  subValue 
+  subValue,
+  isLocked = false
 }: { 
   icon: React.ElementType; 
   label: string; 
   value: string | number; 
   subValue?: string;
+  isLocked?: boolean;
 }) => (
   <div className="flex items-start gap-3 p-3 rounded-lg bg-background/50 hover:bg-background/80 transition-colors">
     <div className="p-2 rounded-md bg-primary/10">
@@ -68,26 +50,23 @@ const StatItem = ({
     </div>
     <div className="flex-1 min-w-0">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-semibold text-sm truncate">{value}</p>
-      {subValue && <p className="text-xs text-muted-foreground">{subValue}</p>}
+      {isLocked ? (
+        <div className="flex items-center gap-1 text-muted-foreground">
+          <Lock className="w-3 h-3" />
+          <span className="text-xs font-medium">Pro</span>
+        </div>
+      ) : (
+        <>
+          <p className="font-semibold text-sm truncate">{value}</p>
+          {subValue && <p className="text-xs text-muted-foreground">{subValue}</p>}
+        </>
+      )}
     </div>
   </div>
 );
 
 export const CompanyFundamentals = ({ symbol }: CompanyFundamentalsProps) => {
-  const { data: fundamentals, isLoading, error } = useQuery({
-    queryKey: ["fundamentals", symbol],
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke("market-data", {
-        body: { symbols: [symbol], type: "fundamentals" },
-      });
-      
-      if (error) throw error;
-      return data.fundamentals as FundamentalsData;
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !!symbol,
-  });
+  const { data: fundamentals, loading: isLoading, error, isFieldLocked } = useFundamentals(symbol);
 
   if (isLoading) {
     return (
@@ -159,7 +138,7 @@ export const CompanyFundamentals = ({ symbol }: CompanyFundamentalsProps) => {
           <StatItem
             icon={BarChart3}
             label="P/E Ratio"
-            value={fundamentals.pe?.toFixed(2) || "N/A"}
+            value={fundamentals.peRatio?.toFixed(2) || "N/A"}
           />
           <StatItem
             icon={TrendingUp}
@@ -175,17 +154,30 @@ export const CompanyFundamentals = ({ symbol }: CompanyFundamentalsProps) => {
             icon={Percent}
             label="Profit Margin"
             value={formatPercent(fundamentals.profitMargin)}
+            isLocked={isFieldLocked('profitMargin')}
           />
           <StatItem
             icon={TrendingUp}
             label="Net Income"
             value={formatLargeNumber(fundamentals.netIncome)}
           />
-          {fundamentals.dividendYield > 0 && (
+          <StatItem
+            icon={BarChart3}
+            label="ROE"
+            value={fundamentals.roe ? `${fundamentals.roe.toFixed(2)}%` : "N/A"}
+            isLocked={isFieldLocked('roe')}
+          />
+          <StatItem
+            icon={BarChart3}
+            label="Debt/Equity"
+            value={fundamentals.debtToEquity?.toFixed(2) || "N/A"}
+            isLocked={isFieldLocked('debtToEquity')}
+          />
+          {fundamentals.dividendYield != null && fundamentals.dividendYield > 0 && (
             <StatItem
               icon={Calendar}
               label="Dividend Yield"
-              value={`${(fundamentals.dividendYield * 100).toFixed(2)}%`}
+              value={`${fundamentals.dividendYield.toFixed(2)}%`}
             />
           )}
           {fundamentals.beta && (
@@ -195,34 +187,12 @@ export const CompanyFundamentals = ({ symbol }: CompanyFundamentalsProps) => {
               value={fundamentals.beta.toFixed(2)}
             />
           )}
-          {fundamentals.employees && (
-            <StatItem
-              icon={Users}
-              label="Employees"
-              value={fundamentals.employees.toLocaleString()}
-            />
-          )}
-          {fundamentals.country && (
-            <StatItem
-              icon={Globe}
-              label="Country"
-              value={fundamentals.country}
-            />
-          )}
         </div>
         
         {fundamentals.industry && (
           <div className="pt-2 border-t border-border/50">
             <p className="text-xs text-muted-foreground">
               <span className="font-medium">Industry:</span> {fundamentals.industry}
-            </p>
-          </div>
-        )}
-        
-        {fundamentals.description && (
-          <div className="pt-2">
-            <p className="text-xs text-muted-foreground line-clamp-3">
-              {fundamentals.description}
             </p>
           </div>
         )}

@@ -3,8 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Search, ExternalLink, Newspaper, AlertCircle } from "lucide-react";
+import { Loader2, Search, ExternalLink, Newspaper, AlertCircle, Lock, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SubscriptionModal } from "@/components/premium/SubscriptionModal";
 
 interface Article {
   title: string;
@@ -24,16 +25,26 @@ export function StockResearchPanel({ symbol, companyName, className }: StockRese
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [premiumRequired, setPremiumRequired] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   const handleResearch = async () => {
     setLoading(true);
     setError(null);
     setArticles([]);
+    setPremiumRequired(false);
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke('stock-research', {
         body: { symbol, companyName },
       });
+
+      // Handle 403 premium_required response
+      if (data?.error === 'premium_required') {
+        setPremiumRequired(true);
+        setHasSearched(true);
+        return;
+      }
 
       if (fnError) throw fnError;
       if (!data?.success) throw new Error(data?.error || 'Research failed');
@@ -91,7 +102,29 @@ export function StockResearchPanel({ symbol, companyName, className }: StockRese
           </p>
         )}
 
-        {hasSearched && articles.length === 0 && !loading && !error && (
+        {premiumRequired && (
+          <div className="flex flex-col items-center gap-3 py-4">
+            <div className="p-2 rounded-full bg-primary/10">
+              <Lock className="w-5 h-5 text-primary" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-medium">Pro Feature</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Web research requires a Pro subscription
+              </p>
+            </div>
+            <Button 
+              size="sm" 
+              onClick={() => setShowSubscriptionModal(true)}
+              className="gap-1.5"
+            >
+              <Sparkles className="w-3 h-3" />
+              Upgrade to Pro
+            </Button>
+          </div>
+        )}
+
+        {hasSearched && articles.length === 0 && !loading && !error && !premiumRequired && (
           <p className="text-xs text-muted-foreground text-center py-4">
             No recent articles found for {symbol}
           </p>
@@ -125,6 +158,11 @@ export function StockResearchPanel({ symbol, companyName, className }: StockRese
           </ScrollArea>
         )}
       </CardContent>
+
+      <SubscriptionModal 
+        open={showSubscriptionModal} 
+        onOpenChange={setShowSubscriptionModal} 
+      />
     </Card>
   );
 }

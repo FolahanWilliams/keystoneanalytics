@@ -1,5 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { 
+  getUserTier, 
+  getUserIdFromAuth,
+  maskPremiumFields, 
+  PREMIUM_FUNDAMENTAL_FIELDS,
+  type SubscriptionTier 
+} from "../_shared/tierCheck.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,20 +26,14 @@ serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    let isAuthenticated = false;
-
-    if (authHeader?.startsWith("Bearer ")) {
-      const supabaseClient = createClient(
-        Deno.env.get("SUPABASE_URL") ?? "",
-        Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-        { global: { headers: { Authorization: authHeader } } }
-      );
-      const token = authHeader.replace("Bearer ", "");
-      const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-      isAuthenticated = !claimsError && !!claimsData?.claims;
-    }
-
-    console.log(`Fundamentals request - authenticated: ${isAuthenticated}`);
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    
+    // Get user ID and tier for paywall enforcement
+    const userId = await getUserIdFromAuth(authHeader, supabaseUrl, anonKey);
+    const tier: SubscriptionTier = userId ? await getUserTier(userId) : 'free';
+    
+    console.log(`Fundamentals request - userId: ${userId}, tier: ${tier}`);
 
     const { symbol } = await req.json();
 
@@ -262,9 +263,16 @@ serve(async (req) => {
       dataSource: "fmp",
     };
 
-    console.log(`Fundamentals fetched for ${symbol}: PE=${fundamentals.peRatio}, D/E=${fundamentals.debtToEquity}, EPS Growth=${fundamentals.epsGrowth}`);
+    console.log(`Fundamentals fetched for ${symbol}: PE=${fundamentals.peRatio}, D/E=${fundamentals.debtToEquity}, tier=${tier}`);
 
-    return new Response(JSON.stringify({ fundamentals }), {
+    // Apply premium field masking for free tier users
+    const maskedFundamentals = maskPremiumFields(
+      fundamentals,
+      tier,
+      PREMIUM_FUNDAMENTAL_FIELDS
+    );
+
+    return new Response(JSON.stringify({ fundamentals: maskedFundamentals }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { getUserTier, hasPremiumAccess } from "../_shared/tierCheck.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    // Authentication check
+    // Authentication check - REQUIRED for research
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(
@@ -38,7 +39,21 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Stock research request - authenticated user: ${user.id}`);
+    // PAYWALL: Check subscription tier - research requires Pro+
+    const tier = await getUserTier(user.id);
+    console.log(`Stock research request - user: ${user.id}, tier: ${tier}`);
+    
+    if (!hasPremiumAccess(tier)) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'premium_required',
+          message: 'Stock research is a Pro feature. Upgrade to access web research and analysis.',
+          requiredTier: 'pro'
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { symbol, companyName } = await req.json();
 
