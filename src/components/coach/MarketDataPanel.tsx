@@ -161,7 +161,7 @@ export function MarketDataPanel({ symbol, onSymbolChange }: MarketDataPanelProps
                   {trend}
                 </Badge>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-xs">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="text-muted-foreground">SMA(20)</span>
                   <p className="font-mono font-medium">
@@ -174,13 +174,17 @@ export function MarketDataPanel({ symbol, onSymbolChange }: MarketDataPanelProps
                     {indicators.ma50 !== undefined ? `$${indicators.ma50.toFixed(2)}` : 'N/A'}
                   </p>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">SMA(200)</span>
-                  <p className="font-mono font-medium">
-                    {indicators.ma200 !== undefined ? `$${indicators.ma200.toFixed(2)}` : 'N/A'}
-                  </p>
-                </div>
               </div>
+              {indicators.emaCrossover && (
+                <div className="mt-2 text-xs">
+                  <span className="text-muted-foreground">EMA Crossover: </span>
+                  <span className={cn(
+                    "font-medium capitalize",
+                    indicators.emaCrossover === 'bullish' && "text-gain",
+                    indicators.emaCrossover === 'bearish' && "text-loss"
+                  )}>{indicators.emaCrossover}</span>
+                </div>
+              )}
             </div>
 
             {/* RSI */}
@@ -277,7 +281,7 @@ export function MarketDataPanel({ symbol, onSymbolChange }: MarketDataPanelProps
               Insufficient History
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Need 200+ days of data for reliable analysis.
+              Need 100+ days of data for reliable analysis.
             </p>
           </div>
         )}

@@ -29,21 +29,22 @@ export function useVerdict({ symbol, sentimentData }: UseVerdictProps): {
 
   const verdict = useMemo(() => {
     // Validate market data - log warnings for missing critical indicators
-    const hasMA200 = indicators.ma200 !== undefined;
     const hasMA50 = indicators.ma50 !== undefined;
+    const hasMA20 = indicators.ma20 !== undefined;
     const hasRSI = indicators.rsi !== undefined;
     
-    if (!hasMA200 && indicators.dataQuality !== 'insufficient') {
-      console.warn(`[Verdict] Missing 200-day MA for ${symbol} - insufficient historical data`);
+    if (!hasMA50 && indicators.dataQuality !== 'insufficient') {
+      console.warn(`[Verdict] Missing 50-day MA for ${symbol} - insufficient historical data`);
     }
     
-    // Build market data input with validated indicators
+    // Build market data input with validated indicators (short-term strategy)
     const marketData = {
       price: indicators.price,
-      ma200: indicators.ma200,
-      ma50: indicators.ma50,
+      ma50: indicators.ma50,     // Primary trend indicator
+      ma20: indicators.ma20,     // Short-term trend
       rsi: indicators.rsi,
       macdSignal: indicators.macdSignal,
+      emaCrossover: indicators.emaCrossover, // EMA 20/50 crossover signal
       volume: indicators.volume,
       avgVolume: indicators.avgVolume,
       priceChange: indicators.priceChange,

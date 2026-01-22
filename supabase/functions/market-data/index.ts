@@ -545,24 +545,26 @@ serve(async (req) => {
         }
       }
 
-      // Fallback to Alpha Vantage for historical data
+      // Fallback to Alpha Vantage for historical data (optimized for short-term strategy)
       const ALPHA_VANTAGE_KEY = Deno.env.get("ALPHA_VANTAGE_API_KEY");
       if (ALPHA_VANTAGE_KEY) {
         console.log(`Trying Alpha Vantage for ${symbol}`);
         try {
+          // Use outputsize=full to get up to 20 years of data, then slice to needed window
           const avResponse = await fetch(
-            `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodedSymbol}&outputsize=compact&apikey=${ALPHA_VANTAGE_KEY}`
+            `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodedSymbol}&outputsize=full&apikey=${ALPHA_VANTAGE_KEY}`
           );
           const avData = await avResponse.json();
 
           if (avData["Time Series (Daily)"]) {
             const timeSeries = avData["Time Series (Daily)"];
-            const dates = Object.keys(timeSeries).sort().slice(-30); // Last 30 days
+            // Slice to requested candleDays (default 120 for short-term indicator strategy)
+            const dates = Object.keys(timeSeries).sort().slice(-candleDays);
 
             const candles = dates.map((dateStr) => {
               const d = timeSeries[dateStr];
               return {
-                date: new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                date: dateStr, // Keep YYYY-MM-DD format for lightweight-charts
                 timestamp: new Date(dateStr).getTime() / 1000,
                 open: parseFloat(d["1. open"]),
                 high: parseFloat(d["2. high"]),
@@ -589,136 +591,17 @@ serve(async (req) => {
         }
       }
 
-      // Final fallback: Generate synthetic chart data based on current quote and resolution
-      console.log(`Generating synthetic candles for ${symbol} with resolution=${candleResolution}, days=${candleDays}`);
-      try {
-        const quoteResponse = await fetch(
-          `https://finnhub.io/api/v1/quote?symbol=${encodedSymbol}&token=${FINNHUB_API_KEY}`
-        );
-        const quote = await quoteResponse.json();
-
-        if (quote.c && quote.c > 0) {
-          const currentPrice = quote.c;
-          const candles = [];
-
-          // Determine number of candles and time step based on resolution
-          let numCandles: number;
-          let timeStepMs: number;
-          let volatility: number;
-          let dateFormatOptions: Intl.DateTimeFormatOptions;
-
-          switch (candleResolution) {
-            case "1":
-              numCandles = Math.min(60, candleDays * 60 * 24);
-              timeStepMs = 60 * 1000; // 1 minute
-              volatility = 0.001;
-              dateFormatOptions = { hour: "2-digit", minute: "2-digit" };
-              break;
-            case "5":
-              numCandles = Math.min(120, candleDays * 12 * 24);
-              timeStepMs = 5 * 60 * 1000;
-              volatility = 0.002;
-              dateFormatOptions = { hour: "2-digit", minute: "2-digit" };
-              break;
-            case "15":
-              numCandles = Math.min(100, candleDays * 4 * 24);
-              timeStepMs = 15 * 60 * 1000;
-              volatility = 0.003;
-              dateFormatOptions = { hour: "2-digit", minute: "2-digit" };
-              break;
-            case "30":
-              numCandles = Math.min(100, candleDays * 2 * 24);
-              timeStepMs = 30 * 60 * 1000;
-              volatility = 0.004;
-              dateFormatOptions = { hour: "2-digit", minute: "2-digit" };
-              break;
-            case "60":
-              numCandles = Math.min(48, candleDays * 24);
-              timeStepMs = 60 * 60 * 1000; // 1 hour
-              volatility = 0.005;
-              dateFormatOptions = { hour: "2-digit", minute: "2-digit" };
-              break;
-            case "240":
-              numCandles = Math.min(60, candleDays * 6);
-              timeStepMs = 4 * 60 * 60 * 1000; // 4 hours
-              volatility = 0.01;
-              dateFormatOptions = { month: "short", day: "numeric", hour: "2-digit" };
-              break;
-            case "W":
-              numCandles = Math.min(52, Math.ceil(candleDays / 7));
-              timeStepMs = 7 * 24 * 60 * 60 * 1000; // 1 week
-              volatility = 0.04;
-              dateFormatOptions = { month: "short", day: "numeric" };
-              break;
-            case "M":
-              numCandles = Math.min(24, Math.ceil(candleDays / 30));
-              timeStepMs = 30 * 24 * 60 * 60 * 1000; // 1 month
-              volatility = 0.06;
-              dateFormatOptions = { month: "short", year: "2-digit" };
-              break;
-            default: // "D" or daily
-              numCandles = Math.min(90, candleDays);
-              timeStepMs = 24 * 60 * 60 * 1000; // 1 day
-              volatility = 0.02;
-              dateFormatOptions = { month: "short", day: "numeric" };
-          }
-
-          let price = currentPrice * (1 - volatility * numCandles * 0.3);
-          const now = Date.now();
-
-          for (let i = numCandles - 1; i >= 0; i--) {
-            const timestamp = now - i * timeStepMs;
-            const date = new Date(timestamp);
-
-            // Skip weekends for daily and higher resolutions
-            if (
-              (candleResolution === "D" || candleResolution === "W") &&
-              (date.getDay() === 0 || date.getDay() === 6)
-            ) {
-              continue;
-            }
-
-            const change = (Math.random() - 0.45) * volatility * price;
-            const open = price;
-            const close = price + change;
-            const high = Math.max(open, close) * (1 + Math.random() * volatility * 0.5);
-            const low = Math.min(open, close) * (1 - Math.random() * volatility * 0.5);
-
-            candles.push({
-              date: date.toLocaleDateString("en-US", dateFormatOptions),
-              timestamp: Math.floor(timestamp / 1000),
-              open: parseFloat(open.toFixed(2)),
-              high: parseFloat(high.toFixed(2)),
-              low: parseFloat(low.toFixed(2)),
-              close: parseFloat(close.toFixed(2)),
-              volume: Math.floor(Math.random() * 10000000) + 1000000,
-            });
-
-            price = close;
-          }
-
-          // Adjust last candle to match current price
-          if (candles.length > 0) {
-            candles[candles.length - 1].close = currentPrice;
-            candles[candles.length - 1].high = Math.max(candles[candles.length - 1].high, currentPrice);
-            candles[candles.length - 1].low = Math.min(candles[candles.length - 1].low, currentPrice);
-          }
-
-          console.log(`Generated ${candles.length} synthetic candles for ${symbol}`);
-          const payload = { candles, synthetic: true, resolution: candleResolution };
-          setCache(cacheKey, payload);
-
-          return new Response(JSON.stringify(payload), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-      } catch (synthError) {
-        console.error("Synthetic candle generation error:", synthError);
-      }
-
-      return new Response(JSON.stringify({ candles: [], error: "No historical data available" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Final fallback: Return clear error - NO synthetic data generation
+      // This ensures all signals shown to users are based on real market data
+      console.log(`No historical data available for ${symbol} from any provider`);
+      return new Response(
+        JSON.stringify({ 
+          candles: [], 
+          error: "no_data",
+          message: "Historical data unavailable from all providers. Try a different symbol or check back later." 
+        }), 
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Search for symbols

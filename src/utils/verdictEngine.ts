@@ -38,10 +38,11 @@ const LAYER_WEIGHTS = {
 
 interface MarketData {
   price?: number;
-  ma200?: number;
-  ma50?: number;
+  ma50?: number;     // Primary trend indicator (replaced ma200)
+  ma20?: number;     // Short-term trend
   rsi?: number;
   macdSignal?: 'bullish' | 'bearish' | 'neutral';
+  emaCrossover?: 'bullish' | 'bearish' | 'neutral'; // EMA 20/50 crossover signal
   volume?: number;
   avgVolume?: number;
   atr?: number;
@@ -86,40 +87,62 @@ export interface VerdictInput {
 function calculateTechnicalMetrics(data: MarketData): VerdictMetric[] {
   const metrics: VerdictMetric[] = [];
 
-  // Price vs 200-day MA (15 points max contribution)
-  if (data.price !== undefined && data.ma200 !== undefined) {
-    const ratio = data.price / data.ma200;
+  // Price vs 50-day MA - Primary Trend Indicator (25% weight)
+  // Short-term strategy: 50-day MA replaces 200-day for faster, more responsive signals
+  if (data.price !== undefined && data.ma50 !== undefined) {
+    const ratio = data.price / data.ma50;
     let score = 50;
     let signal: 'bullish' | 'bearish' | 'neutral' = 'neutral';
-    let description = 'Price at 200-day MA';
+    let description = 'Price at 50-day MA';
 
-    if (ratio > 1.1) {
+    if (ratio > 1.08) {
       score = 85;
       signal = 'bullish';
-      description = `Trading ${((ratio - 1) * 100).toFixed(1)}% above 200-day MA`;
+      description = `Trading ${((ratio - 1) * 100).toFixed(1)}% above 50-day MA`;
     } else if (ratio > 1) {
       score = 65;
       signal = 'bullish';
-      description = `Trading ${((ratio - 1) * 100).toFixed(1)}% above 200-day MA`;
-    } else if (ratio < 0.9) {
+      description = `Trading ${((ratio - 1) * 100).toFixed(1)}% above 50-day MA`;
+    } else if (ratio < 0.92) {
       score = 15;
       signal = 'bearish';
-      description = `Trading ${((1 - ratio) * 100).toFixed(1)}% below 200-day MA`;
+      description = `Trading ${((1 - ratio) * 100).toFixed(1)}% below 50-day MA`;
     } else if (ratio < 1) {
       score = 35;
       signal = 'bearish';
-      description = `Trading ${((1 - ratio) * 100).toFixed(1)}% below 200-day MA`;
+      description = `Trading ${((1 - ratio) * 100).toFixed(1)}% below 50-day MA`;
     }
 
     metrics.push({
-      id: 'price_vs_ma200',
-      name: 'Price vs 200-MA',
+      id: 'price_vs_ma50',
+      name: 'Price vs 50-MA',
       layer: 'technical',
       score,
       weight: 0.25,
       signal,
       description,
       strength: Math.abs(ratio - 1) * 200,
+    });
+  }
+
+  // EMA 20/50 Crossover Signal (15% weight) - Detects short-term momentum shifts
+  if (data.emaCrossover) {
+    const scoreMap = { bullish: 80, bearish: 20, neutral: 50 };
+    const descriptionMap = {
+      bullish: 'Short-term EMA crossed above intermediate EMA - bullish momentum',
+      bearish: 'Short-term EMA crossed below intermediate EMA - bearish momentum',
+      neutral: 'EMAs converging - awaiting direction'
+    };
+    
+    metrics.push({
+      id: 'ema_crossover',
+      name: '20/50 EMA Crossover',
+      layer: 'technical',
+      score: scoreMap[data.emaCrossover],
+      weight: 0.15,
+      signal: data.emaCrossover,
+      description: descriptionMap[data.emaCrossover],
+      strength: data.emaCrossover !== 'neutral' ? 70 : 30,
     });
   }
 
@@ -169,7 +192,7 @@ function calculateTechnicalMetrics(data: MarketData): VerdictMetric[] {
     });
   }
 
-  // MACD Signal
+  // MACD Signal (15% weight - reduced to make room for EMA crossover)
   if (data.macdSignal) {
     const score = data.macdSignal === 'bullish' ? 75 : data.macdSignal === 'bearish' ? 25 : 50;
     metrics.push({
@@ -177,27 +200,27 @@ function calculateTechnicalMetrics(data: MarketData): VerdictMetric[] {
       name: 'MACD Crossover',
       layer: 'technical',
       score,
-      weight: 0.20,
+      weight: 0.15,
       signal: data.macdSignal,
       description: `MACD showing ${data.macdSignal} crossover`,
       strength: data.macdSignal !== 'neutral' ? 60 : 20,
     });
   }
 
-  // Price vs 50-day MA
-  if (data.price !== undefined && data.ma50 !== undefined) {
-    const ratio = data.price / data.ma50;
+  // Price vs 20-day MA - Short-term momentum (10% weight)
+  if (data.price !== undefined && data.ma20 !== undefined) {
+    const ratio = data.price / data.ma20;
     const score = ratio > 1 ? 65 + Math.min(20, (ratio - 1) * 100) : 35 - Math.min(20, (1 - ratio) * 100);
     const signal = ratio > 1 ? 'bullish' : ratio < 1 ? 'bearish' : 'neutral';
 
     metrics.push({
-      id: 'price_vs_ma50',
-      name: 'Price vs 50-MA',
+      id: 'price_vs_ma20',
+      name: 'Price vs 20-MA',
       layer: 'technical',
       score: Math.max(0, Math.min(100, score)),
-      weight: 0.15,
+      weight: 0.10,
       signal,
-      description: ratio > 1 ? `${((ratio - 1) * 100).toFixed(1)}% above 50-day MA` : `${((1 - ratio) * 100).toFixed(1)}% below 50-day MA`,
+      description: ratio > 1 ? `${((ratio - 1) * 100).toFixed(1)}% above 20-day MA` : `${((1 - ratio) * 100).toFixed(1)}% below 20-day MA`,
       strength: Math.abs(ratio - 1) * 150,
     });
   }
@@ -632,10 +655,11 @@ export function generateDemoVerdictInput(): VerdictInput {
   return {
     market: {
       price: 185.50,
-      ma200: 172.30,
       ma50: 180.20,
+      ma20: 183.10,
       rsi: 58,
       macdSignal: 'bullish',
+      emaCrossover: 'bullish',
       volume: 42000000,
       avgVolume: 35000000,
       priceChange: 2.5,

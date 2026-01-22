@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   calculateSMA, 
+  calculateEMA,
   calculateRSI, 
   calculateMACD 
 } from "@/utils/technicalIndicators";
@@ -11,9 +12,9 @@ import type { Candle } from "@/types/market";
 
 export interface TechnicalIndicators {
   price?: number;
-  ma200?: number;
-  ma50?: number;
-  ma20?: number;
+  ma50?: number;     // Primary trend indicator (short-term strategy)
+  ma20?: number;     // Short-term trend
+  emaCrossover?: 'bullish' | 'bearish' | 'neutral'; // EMA 20/50 crossover signal
   rsi?: number;
   macdSignal?: 'bullish' | 'bearish' | 'neutral';
   macdHistogramTrend?: 'increasing' | 'decreasing' | 'flat';
@@ -125,26 +126,50 @@ export function useTechnicalIndicators(symbol: string): {
     const closes = candles.map(c => c.close);
     const candleCount = candles.length;
     
-    // Determine data quality based on available candles
+    // Data quality: 100+ days = full, 50-99 = partial, <50 = insufficient
     let dataQuality: 'full' | 'partial' | 'insufficient' = 'full';
-    if (candleCount < 200) {
+    if (candleCount < 100) {
       dataQuality = candleCount >= 50 ? 'partial' : 'insufficient';
     }
     
-    // Calculate moving averages
+    // Calculate moving averages (short-term strategy)
     const sma20Values = calculateSMA(closes, 20);
     const sma50Values = candleCount >= 50 ? calculateSMA(closes, 50) : [];
-    const sma200Values = candleCount >= 200 ? calculateSMA(closes, 200) : [];
+    const ema20Values = candleCount >= 20 ? calculateEMA(closes, 20) : [];
+    const ema50Values = candleCount >= 50 ? calculateEMA(closes, 50) : [];
     
     const ma20 = getLastValidValue(sma20Values);
     const ma50 = getLastValidValue(sma50Values);
-    const ma200 = getLastValidValue(sma200Values);
     
-    // Calculate RSI (needs 14+ periods)
+    // Calculate EMA 20/50 Crossover Signal
+    let emaCrossover: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+    if (candleCount >= 50) {
+      const currentEma20 = getLastValidValue(ema20Values);
+      const currentEma50 = getLastValidValue(ema50Values);
+      const ema20Last2 = getLastNValues(ema20Values, 2);
+      const ema50Last2 = getLastNValues(ema50Values, 2);
+      
+      if (currentEma20 && currentEma50 && ema20Last2.length >= 2 && ema50Last2.length >= 2) {
+        const prevEma20 = ema20Last2[0];
+        const prevEma50 = ema50Last2[0];
+        
+        if (prevEma20 <= prevEma50 && currentEma20 > currentEma50) {
+          emaCrossover = 'bullish';
+        } else if (prevEma20 >= prevEma50 && currentEma20 < currentEma50) {
+          emaCrossover = 'bearish';
+        } else if (currentEma20 > currentEma50) {
+          emaCrossover = 'bullish';
+        } else if (currentEma20 < currentEma50) {
+          emaCrossover = 'bearish';
+        }
+      }
+    }
+    
+    // Calculate RSI
     const rsiValues = candleCount >= 14 ? calculateRSI(closes, 14) : [];
     const rsi = getLastValidValue(rsiValues);
     
-    // Calculate MACD (needs 26 for slow EMA + 9 for signal = 35 minimum)
+    // Calculate MACD
     let macdSignal: 'bullish' | 'bearish' | 'neutral' = 'neutral';
     let macdHistogramTrend: 'increasing' | 'decreasing' | 'flat' = 'flat';
     
@@ -152,29 +177,19 @@ export function useTechnicalIndicators(symbol: string): {
       const { macd, signal, histogram } = calculateMACD(closes);
       const lastMacd = getLastValidValue(macd);
       const lastSignal = getLastValidValue(signal);
-      
-      // Get last 3 histogram values for trend detection
       const histogramValues = getLastNValues(histogram, 3);
       
       if (lastMacd !== undefined && lastSignal !== undefined) {
-        // Determine histogram trend (momentum direction)
         if (histogramValues.length >= 2) {
           const lastHist = histogramValues[histogramValues.length - 1];
           const prevHist = histogramValues[histogramValues.length - 2];
           const diff = lastHist - prevHist;
           
-          if (Math.abs(diff) < 0.01) {
-            macdHistogramTrend = 'flat';
-          } else if (diff > 0) {
-            macdHistogramTrend = 'increasing';
-          } else {
-            macdHistogramTrend = 'decreasing';
-          }
+          if (Math.abs(diff) < 0.01) macdHistogramTrend = 'flat';
+          else if (diff > 0) macdHistogramTrend = 'increasing';
+          else macdHistogramTrend = 'decreasing';
         }
         
-        // Improved MACD signal detection
-        // Bullish: MACD above signal AND (histogram positive OR increasing)
-        // Bearish: MACD below signal AND (histogram negative OR decreasing)
         const macdAboveSignal = lastMacd > lastSignal;
         const histogramPositive = histogramValues.length > 0 && histogramValues[histogramValues.length - 1] > 0;
         
@@ -183,37 +198,21 @@ export function useTechnicalIndicators(symbol: string): {
         } else if (!macdAboveSignal && (!histogramPositive || macdHistogramTrend === 'decreasing')) {
           macdSignal = 'bearish';
         }
-        // Check for crossover (stronger signal)
-        if (histogramValues.length >= 2) {
-          const prevHist = histogramValues[histogramValues.length - 2];
-          const currHist = histogramValues[histogramValues.length - 1];
-          // Bullish crossover: histogram went from negative to positive
-          if (prevHist < 0 && currHist > 0) {
-            macdSignal = 'bullish';
-          }
-          // Bearish crossover: histogram went from positive to negative
-          if (prevHist > 0 && currHist < 0) {
-            macdSignal = 'bearish';
-          }
-        }
       }
     }
     
-    // Get current price and volume from latest candle
     const currentPrice = closes[closes.length - 1];
     const currentVolume = candles[candles.length - 1]?.volume;
     const avgVolume = calculateAvgVolume(candles, 20);
-    
-    // Calculate price change percentage from previous close
     const priceChange = closes.length >= 2
       ? ((closes[closes.length - 1] - closes[closes.length - 2]) / closes[closes.length - 2]) * 100
       : undefined;
     
     return {
       price: currentPrice,
-      ma200,
       ma50,
       ma20,
+      emaCrossover,
       rsi,
       macdSignal,
       macdHistogramTrend,
