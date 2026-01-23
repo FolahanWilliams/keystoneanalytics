@@ -427,7 +427,7 @@ serve(async (req) => {
               const aggregated = aggregateCandles(raw, candleResolution);
               
               const candles = aggregated.map((c) => ({
-                date: formatDate(c.timestamp * 1000, dateFormat),
+                date: new Date(c.timestamp * 1000).toISOString().split('T')[0], // YYYY-MM-DD for lightweight-charts
                 timestamp: c.timestamp,
                 open: c.open,
                 high: c.high,
@@ -446,7 +446,7 @@ serve(async (req) => {
             }
             
             const candles = rawCandles.map((d: any) => ({
-              date: formatDate(new Date(d.date).getTime(), dateFormat),
+              date: d.date, // Keep YYYY-MM-DD format for lightweight-charts
               timestamp: new Date(d.date).getTime() / 1000,
               open: d.open,
               high: d.high,
@@ -491,10 +491,8 @@ serve(async (req) => {
       if (finnhubData.s === "ok" && finnhubData.t?.length > 0) {
         const raw = mapFinnhubToRaw(finnhubData);
         const finalRaw = aggregateCandles(raw, candleResolution);
-        const dateFormat = getDateFormat(candleResolution);
-
         const candles = finalRaw.map((c) => ({
-          date: formatDate(c.timestamp * 1000, dateFormat),
+          date: new Date(c.timestamp * 1000).toISOString().split('T')[0], // YYYY-MM-DD for lightweight-charts
           timestamp: c.timestamp,
           open: c.open,
           high: c.high,
@@ -503,7 +501,7 @@ serve(async (req) => {
           volume: c.volume,
         }));
 
-        const payload = { candles, resolution: candleResolution };
+        const payload = { candles, resolution: candleResolution, source: "finnhub" };
         setCache(cacheKey, payload);
 
         return new Response(JSON.stringify(payload), {
@@ -524,10 +522,9 @@ serve(async (req) => {
         if (baseData.s === "ok" && baseData.t?.length > 0) {
           const raw = mapFinnhubToRaw(baseData);
           const aggregated = aggregateCandles(raw, candleResolution);
-          const dateFormat = getDateFormat(candleResolution);
 
           const candles = aggregated.map((c) => ({
-            date: formatDate(c.timestamp * 1000, dateFormat),
+            date: new Date(c.timestamp * 1000).toISOString().split('T')[0], // YYYY-MM-DD for lightweight-charts
             timestamp: c.timestamp,
             open: c.open,
             high: c.high,
@@ -536,7 +533,7 @@ serve(async (req) => {
             volume: c.volume,
           }));
 
-          const payload = { candles, resolution: candleResolution, aggregatedFrom: baseResolution };
+          const payload = { candles, resolution: candleResolution, aggregatedFrom: baseResolution, source: "finnhub" };
           setCache(cacheKey, payload);
 
           return new Response(JSON.stringify(payload), {
