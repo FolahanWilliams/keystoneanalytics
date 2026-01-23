@@ -79,7 +79,8 @@ export function useVerdict({ symbol, sentimentData }: UseVerdictProps): {
         analystRating: fundamentals?.analystRating ?? undefined,
       },
       macro: {
-        vix: vixLevel ?? 18, // Use live VIX, fallback to 18 if unavailable
+        // Use live VIX level - if unavailable, the verdict engine handles undefined gracefully
+        vix: vixLevel,
         interestRateTrend,
         yieldCurve: analysis?.recessionSignal ? 'inverted' : 'normal',
         sectorRotation: analysis?.riskSentiment?.includes('risk-on') ? 'risk_on'
