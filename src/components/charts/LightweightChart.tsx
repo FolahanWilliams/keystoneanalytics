@@ -45,7 +45,7 @@ export function LightweightChart({
     const sma50: LineData<Time>[] = [];
 
     data.forEach((c) => {
-      // Convert timestamp to YYYY-MM-DD string format for lightweight-charts
+      // Use date string directly as Time (YYYY-MM-DD format)
       const time = c.date as Time;
 
       candles.push({
@@ -72,15 +72,16 @@ export function LightweightChart({
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Zinc-950 background for professional terminal theme
     const chart = createChart(containerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: '#09090b' }, // Zinc-950
-        textColor: '#a1a1aa', // Zinc-400
+        background: { type: ColorType.Solid, color: '#09090b' },
+        textColor: '#a1a1aa',
       },
       width: containerRef.current.clientWidth,
       height,
       grid: {
-        vertLines: { color: '#27272a', style: 1 }, // Subtle gridlines
+        vertLines: { color: '#27272a', style: 1 },
         horzLines: { color: '#27272a', style: 1 },
       },
       crosshair: {
@@ -101,8 +102,8 @@ export function LightweightChart({
 
     // Candlestick series with professional colors (v5 API)
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#22c55e',      // Emerald for up
-      downColor: '#ef4444',    // Red for down
+      upColor: '#22c55e',
+      downColor: '#ef4444',
       borderUpColor: '#22c55e',
       borderDownColor: '#ef4444',
       wickUpColor: '#22c55e',

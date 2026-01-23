@@ -25,13 +25,19 @@ function PriceChartComponent({
   const chartData = useMemo(() => {
     if (!data || data.length === 0) return [];
     
-    return data.map(candle => ({
-      ...candle,
+    return data.map(candle => {
       // Ensure date is in YYYY-MM-DD format
-      date: candle.date.includes('-') 
-        ? candle.date 
-        : new Date(candle.timestamp * 1000).toISOString().split('T')[0],
-    }));
+      let dateStr = candle.date;
+      if (!dateStr || !dateStr.includes('-')) {
+        // Convert timestamp to YYYY-MM-DD
+        dateStr = new Date(candle.timestamp * 1000).toISOString().split('T')[0];
+      }
+      
+      return {
+        ...candle,
+        date: dateStr,
+      };
+    });
   }, [data]);
 
   if (chartData.length === 0) {

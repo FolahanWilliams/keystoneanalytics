@@ -211,7 +211,7 @@ serve(async (req) => {
     }
 
     const FMP_API_KEY = Deno.env.get("FMP_API_KEY");
-    const FINNHUB_API_KEY = Deno.env.get("FINHUB_API_KEY");
+    const FINNHUB_API_KEY = Deno.env.get("FINNHUB_API_KEY");
 
     if (!FMP_API_KEY && !FINNHUB_API_KEY) {
       console.error("No market data API keys configured");
