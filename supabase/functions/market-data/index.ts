@@ -149,32 +149,8 @@ function aggregateCandles(raw: RawCandle[], targetResolution: string): RawCandle
     .map(({ _firstTs: _a, _lastTs: _b, ...rest }) => rest);
 }
 
-// Get appropriate date format based on resolution
-function getDateFormat(resolution: string): Intl.DateTimeFormatOptions {
-  switch (resolution) {
-    case "1":
-    case "5":
-    case "15":
-    case "30":
-    case "60":
-      return { hour: "2-digit", minute: "2-digit" };
-    case "240":
-      return { month: "short", day: "numeric", hour: "2-digit" };
-    case "D":
-      return { month: "short", day: "numeric" };
-    case "W":
-      return { month: "short", day: "numeric" };
-    case "M":
-      return { month: "short", year: "2-digit" };
-    default:
-      return { month: "short", day: "numeric" };
-  }
-}
-
-// Format date with given options
-function formatDate(timestamp: number, options: Intl.DateTimeFormatOptions): string {
-  return new Date(timestamp).toLocaleDateString("en-US", options);
-}
+// NOTE: We intentionally standardize all candle dates for the frontend charting library.
+// Every candle returned to the client must include a `date` string in strict YYYY-MM-DD format.
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -410,8 +386,7 @@ serve(async (req) => {
           );
           const fmpHistData = await fmpHistRes.json();
           
-          if (fmpHistData.historical && fmpHistData.historical.length > 0) {
-            const dateFormat = getDateFormat(candleResolution);
+            if (fmpHistData.historical && fmpHistData.historical.length > 0) {
             let rawCandles = fmpHistData.historical.slice(0, candleDays).reverse();
             
             // Aggregate for weekly/monthly if needed
@@ -509,38 +484,9 @@ serve(async (req) => {
         });
       }
 
-      // If the provider doesn't support this resolution, synthesize it from a supported base resolution
-      if (["240", "W", "M"].includes(candleResolution)) {
-        const baseResolution = candleResolution === "240" ? "60" : "D";
-        console.log(`No data for resolution=${candleResolution}; retrying with base=${baseResolution} and aggregating`);
-
-        const baseRes = await fetch(
-          `https://finnhub.io/api/v1/stock/candle?symbol=${encodedSymbol}&resolution=${baseResolution}&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`
-        );
-        const baseData = await baseRes.json();
-
-        if (baseData.s === "ok" && baseData.t?.length > 0) {
-          const raw = mapFinnhubToRaw(baseData);
-          const aggregated = aggregateCandles(raw, candleResolution);
-
-          const candles = aggregated.map((c) => ({
-            date: new Date(c.timestamp * 1000).toISOString().split('T')[0], // YYYY-MM-DD for lightweight-charts
-            timestamp: c.timestamp,
-            open: c.open,
-            high: c.high,
-            low: c.low,
-            close: c.close,
-            volume: c.volume,
-          }));
-
-          const payload = { candles, resolution: candleResolution, aggregatedFrom: baseResolution, source: "finnhub" };
-          setCache(cacheKey, payload);
-
-          return new Response(JSON.stringify(payload), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-      }
+      // IMPORTANT: Do not synthesize/construct candles when the provider doesn't support a resolution.
+      // If Finnhub doesn't return data for the requested resolution, we fall through to other providers
+      // and ultimately return a structured error object.
 
       // Fallback to Alpha Vantage for historical data (optimized for short-term strategy)
       const ALPHA_VANTAGE_KEY = Deno.env.get("ALPHA_VANTAGE_API_KEY");
