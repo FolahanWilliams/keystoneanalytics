@@ -43,7 +43,7 @@ export async function getUserTier(userId: string): Promise<SubscriptionTier> {
     .from('user_subscriptions')
     .select('tier')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
   
   if (error) {
     console.error("Error fetching user tier:", error.message);
