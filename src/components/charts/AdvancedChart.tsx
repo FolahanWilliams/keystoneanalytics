@@ -62,7 +62,11 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 p-8">
         <AlertCircle className="w-10 h-10 text-muted-foreground" />
-        <p className="text-xs text-muted-foreground">Failed to load chart</p>
+        <p className="text-xs text-muted-foreground text-center max-w-xs">
+          {error === "no_data" 
+            ? "Market data temporarily unavailable. Try again shortly."
+            : `Failed to load chart: ${error}`}
+        </p>
         <Button variant="outline" size="sm" onClick={refetch} className="gap-1.5 h-8 text-xs">
           <RefreshCw className="w-3.5 h-3.5" /> Retry
         </Button>

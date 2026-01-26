@@ -381,13 +381,20 @@ serve(async (req) => {
       // Primary: Try FMP for historical candles (daily resolution)
       if (FMP_API_KEY && (candleResolution === "D" || candleResolution === "W" || candleResolution === "M")) {
         try {
+          // Use FMP's stable API endpoint with full OHLC data (not light version)
           const fmpHistRes = await fetch(
-            `https://financialmodelingprep.com/api/v3/historical-price-full/${encodedSymbol}?timeseries=${candleDays * 2}&apikey=${FMP_API_KEY}`
+            `https://financialmodelingprep.com/stable/historical-price-eod/full?symbol=${encodedSymbol}&apikey=${FMP_API_KEY}`
           );
           const fmpHistData = await fmpHistRes.json();
           
-            if (fmpHistData.historical && fmpHistData.historical.length > 0) {
-            let rawCandles = fmpHistData.historical.slice(0, candleDays).reverse();
+          // Diagnostic logging to identify API failures
+          console.log(`FMP historical response for ${symbol}:`, JSON.stringify(fmpHistData).substring(0, 500));
+          
+          // New API returns array directly, not nested in .historical
+          const historicalData = Array.isArray(fmpHistData) ? fmpHistData : fmpHistData.historical;
+          
+          if (historicalData && historicalData.length > 0) {
+            let rawCandles = historicalData.slice(0, candleDays).reverse();
             
             // Aggregate for weekly/monthly if needed
             if (candleResolution === "W" || candleResolution === "M") {
@@ -493,15 +500,18 @@ serve(async (req) => {
       if (ALPHA_VANTAGE_KEY) {
         console.log(`Trying Alpha Vantage for ${symbol}`);
         try {
-          // Use outputsize=full to get up to 20 years of data, then slice to needed window
+          // Use outputsize=compact (100 data points) for free tier compatibility
           const avResponse = await fetch(
-            `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodedSymbol}&outputsize=full&apikey=${ALPHA_VANTAGE_KEY}`
+            `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodedSymbol}&outputsize=compact&apikey=${ALPHA_VANTAGE_KEY}`
           );
           const avData = await avResponse.json();
+          
+          // Diagnostic logging to identify API failures
+          console.log(`Alpha Vantage response for ${symbol}:`, JSON.stringify(avData).substring(0, 500));
 
           if (avData["Time Series (Daily)"]) {
             const timeSeries = avData["Time Series (Daily)"];
-            // Slice to requested candleDays (default 120 for short-term indicator strategy)
+            // Slice to requested candleDays (compact returns ~100 days)
             const dates = Object.keys(timeSeries).sort().slice(-candleDays);
 
             const candles = dates.map((dateStr) => {
