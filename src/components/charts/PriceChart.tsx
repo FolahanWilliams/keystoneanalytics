@@ -93,6 +93,7 @@ function PriceChartComponent({
 
   // Init chart once per mount/height
   useEffect(() => {
+    console.log('[PriceChart] Initializing chart, containerRef:', containerRef.current);
     if (!containerRef.current) return;
 
     const bg = readCssHsl("--chart-bg", "240 10% 3%");
@@ -188,6 +189,7 @@ function PriceChartComponent({
 
   // Candles
   useEffect(() => {
+    console.log('[PriceChart] Setting candle data, count:', candleData.length);
     if (!candleSeriesRef.current || candleData.length === 0) return;
     candleSeriesRef.current.setData(candleData);
     chartRef.current?.timeScale().fitContent();
