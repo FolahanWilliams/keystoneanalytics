@@ -1,210 +1,203 @@
 
+# Full Chart Integration: Timeframe Switcher and Feature Completion
 
-# Deep Analysis: Technical Analysis Charts Failing to Load
+## Problem Summary
 
-## Executive Summary
+The timeframe switcher doesn't work for intraday timeframes (1H, 4H) because:
+1. **FMP only handles D/W/M resolutions** - Intraday requests skip FMP entirely
+2. **Finnhub fails for intraday** - Returns `status: undefined` (likely rate-limited or free tier restriction)
+3. **Alpha Vantage is rate-limited** - Daily limit of 25 requests exceeded
 
-The charts fail because **all three market data API providers (FMP, Finnhub, Alpha Vantage) are returning empty or error responses for historical candle data**. The edge function correctly falls through each provider and ultimately returns `{ candles: [], error: "no_data" }`, which triggers the "Failed to load chart" error in the UI.
+Daily, Weekly, and Monthly work correctly via FMP's stable API endpoint.
 
----
+## Solution Overview
 
-## Root Cause Analysis
+### Phase 1: Fix Intraday Data Fetching
 
-### 1. FMP Historical API - Silent Failure
+Add FMP's intraday chart endpoint for 1H and 4H resolutions:
 
-**Location**: `supabase/functions/market-data/index.ts` lines 382-444
+| Timeframe | Resolution | FMP Endpoint | Interval |
+|-----------|------------|--------------|----------|
+| 1H | "60" | `/stable/historical-price-full/AAPL/1hour` | 1hour |
+| 4H | "240" | `/stable/historical-price-full/AAPL/4hour` | 4hour |
 
-**Problem**: FMP is the primary provider for daily/weekly/monthly candles, but when it fails, there's no logging to understand why.
+**File: `supabase/functions/market-data/index.ts`**
 
-```text
-Line 389: if (fmpHistData.historical && fmpHistData.historical.length > 0)
-```
+Add intraday handling before the daily FMP block (around line 380):
 
-If `fmpHistData.historical` is undefined (API error, rate limit, invalid response), the code silently continues to Finnhub. There's no logging of what FMP actually returned.
-
-**Evidence**: Zero "FMP" entries in recent edge function logs for candle fetches.
-
----
-
-### 2. Finnhub API - Returns Undefined Status
-
-**Location**: `supabase/functions/market-data/index.ts` lines 447-485
-
-**Problem**: Finnhub returns `s: undefined` instead of `s: "ok"`.
-
-**Log Evidence**:
-```text
-Finnhub candle response for AAPL: undefined
-```
-
-This indicates either:
-- The Finnhub API key is invalid or rate-limited
-- The symbol encoding is incorrect  
-- Finnhub's candle endpoint has changed
-
----
-
-### 3. Alpha Vantage - Also Failing Silently
-
-**Location**: `supabase/functions/market-data/index.ts` lines 491-535
-
-**Problem**: Alpha Vantage is tried as a final fallback but also returns no data.
-
-**Log Evidence**: "Trying Alpha Vantage for AAPL" appears, but never "Alpha Vantage returned X candles" which would indicate success.
-
-Possible causes:
-- API key rate limit (5 calls/minute on free tier)
-- Response parsing issue
-- `Time Series (Daily)` key not present in response
-
----
-
-### 4. Secondary Issue: User Subscription Missing
-
-**Location**: `supabase/functions/_shared/tierCheck.ts` lines 42-46
-
-**Error Log**:
-```text
-Error fetching user tier: Cannot coerce the result to a single JSON object
-```
-
-**Cause**: The `.single()` method fails when zero rows are returned. User `00700a86-be80-47fe-aff1-0558f25063cd` has no `user_subscriptions` record.
-
-**Impact**: Not a blocking issue - the function defaults to `tier: 'free'` and continues.
-
----
-
-## Technical Details
-
-### Data Flow Diagram
-
-```text
-+----------------+     +-------------------+     +----------------+
-|  AdvancedChart | --> |   useChartData    | --> |  market-data   |
-|    Component   |     |      Hook         |     | Edge Function  |
-+----------------+     +-------------------+     +----------------+
-                                                        |
-                          +-----------------------------+
-                          |
-        +-----------------+-----------------+------------------+
-        |                 |                 |                  |
-        v                 v                 v                  v
-   +--------+       +---------+       +-------------+    +-----------+
-   |  FMP   |       | Finnhub |       | Alpha Vantage|   | Return    |
-   | (fail) |  -->  | (fail)  |  -->  |   (fail)     |-->| no_data   |
-   +--------+       +---------+       +-------------+    +-----------+
-```
-
-### Edge Function Response When All Fail
-
-```json
-{
-  "candles": [],
-  "error": "no_data",
-  "message": "Historical data unavailable from all providers..."
+```typescript
+// PRIMARY: FMP intraday for 1H and 4H
+if (FMP_API_KEY && (candleResolution === "60" || candleResolution === "240")) {
+  try {
+    const fmpInterval = candleResolution === "60" ? "1hour" : "4hour";
+    const fmpIntradayRes = await fetch(
+      `https://financialmodelingprep.com/api/v3/historical-chart/${fmpInterval}/${encodedSymbol}?apikey=${FMP_API_KEY}`
+    );
+    const fmpIntradayData = await fmpIntradayRes.json();
+    
+    console.log(`FMP intraday ${fmpInterval} response for ${symbol}:`, 
+      JSON.stringify(fmpIntradayData).substring(0, 300));
+    
+    if (Array.isArray(fmpIntradayData) && fmpIntradayData.length > 0) {
+      // Slice to requested number of candles based on days config
+      const maxCandles = candleResolution === "60" ? 48 : 60; // 2 days * 24 or 10 days * 6
+      const slicedData = fmpIntradayData.slice(0, maxCandles).reverse();
+      
+      const candles = slicedData.map((d: any) => ({
+        date: d.date.split(' ')[0], // Keep YYYY-MM-DD
+        timestamp: new Date(d.date).getTime() / 1000,
+        open: d.open,
+        high: d.high,
+        low: d.low,
+        close: d.close,
+        volume: d.volume,
+      }));
+      
+      const payload = { candles, resolution: candleResolution, source: "fmp" };
+      setCache(cacheKey, payload);
+      console.log(`FMP ${fmpInterval} candles for ${symbol}: ${candles.length}`);
+      
+      return new Response(JSON.stringify(payload), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  } catch (fmpError) {
+    console.error(`FMP intraday error for ${symbol}:`, fmpError);
+  }
 }
 ```
 
-### Frontend Error Handling
+### Phase 2: Add Missing Overlay Indicators to PriceChart
 
-```text
-File: src/hooks/useChartData.ts, Line 78
-if (data?.error) throw new Error(data.error);
-```
+Currently `PriceChart.tsx` only renders SMA20 and SMA50. Add support for:
 
-This throws `Error("no_data")` which surfaces as "Failed to load chart".
+- EMA 12 (blue)
+- EMA 26 (purple)
+- Bollinger Bands (upper, middle, lower - cyan)
+- VWAP (amber)
 
----
+**File: `src/components/charts/PriceChart.tsx`**
 
-## Recommended Fix
-
-### Phase 1: Add Diagnostic Logging (Required First)
-
-Add detailed logging to understand exactly what each API is returning.
-
-**File**: `supabase/functions/market-data/index.ts`
+Add new series refs and rendering:
 
 ```typescript
-// After line 387 (FMP fetch)
-console.log(`FMP historical response for ${symbol}:`, JSON.stringify(fmpHistData).substring(0, 500));
+// Add refs for new indicators
+const ema12SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+const ema26SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+const bbUpperSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+const bbMiddleSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+const bbLowerSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+const vwapSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
 
-// After line 500 (Alpha Vantage fetch)  
-console.log(`Alpha Vantage response for ${symbol}:`, JSON.stringify(avData).substring(0, 500));
+// Add indicator enable checks
+const showEma12 = indicators.find((i) => i.id === "ema12")?.enabled ?? false;
+const showEma26 = indicators.find((i) => i.id === "ema26")?.enabled ?? false;
+const showBB = indicators.find((i) => i.id === "bb")?.enabled ?? false;
+const showVwap = indicators.find((i) => i.id === "vwap")?.enabled ?? false;
+
+// Extract data in useMemo
+const { candleData, sma20Data, sma50Data, ema12Data, ema26Data, bbData, vwapData } = useMemo(() => {
+  // ... existing logic
+  const ema12: LineData<Time>[] = [];
+  const ema26: LineData<Time>[] = [];
+  const bbUpper: LineData<Time>[] = [];
+  const bbMiddle: LineData<Time>[] = [];
+  const bbLower: LineData<Time>[] = [];
+  const vwap: LineData<Time>[] = [];
+  
+  for (const c of chartData) {
+    // ... existing
+    if (c.ema12 !== null && c.ema12 !== undefined) ema12.push({ time, value: c.ema12 });
+    if (c.ema26 !== null && c.ema26 !== undefined) ema26.push({ time, value: c.ema26 });
+    if (c.bbUpper !== null && c.bbUpper !== undefined) bbUpper.push({ time, value: c.bbUpper });
+    if (c.bbMiddle !== null && c.bbMiddle !== undefined) bbMiddle.push({ time, value: c.bbMiddle });
+    if (c.bbLower !== null && c.bbLower !== undefined) bbLower.push({ time, value: c.bbLower });
+    if (c.vwap !== null && c.vwap !== undefined) vwap.push({ time, value: c.vwap });
+  }
+  
+  return { candleData, sma20Data, sma50Data, ema12Data: ema12, ema26Data: ema26, 
+           bbData: { upper: bbUpper, middle: bbMiddle, lower: bbLower }, vwapData: vwap };
+}, [chartData]);
 ```
 
----
+### Phase 3: Improve Timeframe Switch UX
 
-### Phase 2: Fix Tier Check Error
+**File: `src/components/charts/AdvancedChart.tsx`**
 
-**File**: `supabase/functions/_shared/tierCheck.ts`
-
-Change `.single()` to `.maybeSingle()` to handle missing subscription records gracefully:
+Show a spinner overlay during data loading instead of clearing the chart:
 
 ```typescript
-// Line 42-46
-const { data, error } = await supabaseAdmin
-    .from('user_subscriptions')
-    .select('tier')
-    .eq('user_id', userId)
-    .maybeSingle();  // Changed from .single()
-```
-
----
-
-### Phase 3: Verify API Keys
-
-Test each API key directly to confirm they work:
-
-| Provider | Secret Name | Test Endpoint |
-|----------|-------------|---------------|
-| FMP | `FMP_API_KEY` | `/api/v3/historical-price-full/AAPL` |
-| Finnhub | `FINNHUB_API_KEY` | `/api/v1/stock/candle?symbol=AAPL` |
-| Alpha Vantage | `ALPHA_VANTAGE_API_KEY` | `TIME_SERIES_DAILY&symbol=AAPL` |
-
----
-
-### Phase 4: Improve Error UX
-
-Show the user a more helpful message when data is unavailable:
-
-**File**: `src/components/charts/AdvancedChart.tsx`, lines 61-70
-
-```typescript
-if (error) {
-  return (
-    <div className="h-full flex flex-col items-center justify-center gap-3 p-8">
-      <AlertCircle className="w-10 h-10 text-muted-foreground" />
-      <p className="text-xs text-muted-foreground">
-        {error === "no_data" 
-          ? "Market data temporarily unavailable. Try again shortly."
-          : "Failed to load chart"}
-      </p>
-      <Button variant="outline" size="sm" onClick={refetch} className="gap-1.5 h-8 text-xs">
-        <RefreshCw className="w-3.5 h-3.5" /> Retry
-      </Button>
+// In the chart area, show loading overlay instead of replacing content
+<div className="flex-1 min-h-0 relative">
+  {loading && (
+    <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
+      <Loader2 className="w-6 h-6 animate-spin text-primary" />
     </div>
-  );
-}
+  )}
+  {enrichedData.length > 0 ? (
+    <div className="h-full flex flex-col gap-0">
+      <PriceChart ... />
+      <VolumeChart ... />
+      {showRSI && <RSIChart ... />}
+      {showMACD && <MACDChart ... />}
+    </div>
+  ) : (
+    !loading && (
+      <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+        No data available for this timeframe
+      </div>
+    )
+  )}
+</div>
+```
+
+### Phase 4: Better Error Messages
+
+**File: `src/components/charts/AdvancedChart.tsx`**
+
+Add specific messaging for intraday failures:
+
+```typescript
+const errorMessage = useMemo(() => {
+  if (error === "no_data") {
+    if (timeframe === "1H" || timeframe === "4H") {
+      return "Intraday data temporarily unavailable. Try Daily or Weekly.";
+    }
+    return "Market data temporarily unavailable. Try again shortly.";
+  }
+  return `Failed to load chart: ${error}`;
+}, [error, timeframe]);
 ```
 
 ---
 
 ## Files to Modify
 
-| File | Change |
-|------|--------|
-| `supabase/functions/market-data/index.ts` | Add diagnostic logging for FMP and Alpha Vantage responses |
-| `supabase/functions/_shared/tierCheck.ts` | Change `.single()` to `.maybeSingle()` |
-| `src/components/charts/AdvancedChart.tsx` | Improve error message for no_data case |
-| `src/hooks/useChartData.ts` | Preserve error code in state for better UX |
+| File | Changes |
+|------|---------|
+| `supabase/functions/market-data/index.ts` | Add FMP intraday endpoint for 1H/4H resolutions |
+| `src/components/charts/PriceChart.tsx` | Add EMA, Bollinger Bands, VWAP overlay rendering |
+| `src/components/charts/AdvancedChart.tsx` | Improve loading state and error messages |
+
+## Expected Results
+
+After implementation:
+
+| Timeframe | Expected Behavior |
+|-----------|-------------------|
+| 1H | Shows hourly candles from FMP intraday API (48 candles) |
+| 4H | Shows 4-hour candles from FMP intraday API (60 candles) |
+| 1D | Works as before - daily candles from FMP |
+| 1W | Works as before - weekly aggregated from FMP daily |
+| 1M | Works as before - monthly aggregated from FMP daily |
+
+All overlay indicators (SMA, EMA, BB, VWAP) will render correctly when toggled on.
 
 ---
 
-## Expected Outcome
+## Technical Notes
 
-After implementing these fixes:
-1. Edge function logs will show exactly what each API returns
-2. Tier check errors will stop appearing in logs
-3. Users will see clearer error messages
-4. Once the API issue is identified (likely rate limits or key issues), the actual fix can be applied
-
+- FMP intraday endpoint: `https://financialmodelingprep.com/api/v3/historical-chart/{interval}/{symbol}`
+- Supported intervals: 1min, 5min, 15min, 30min, 1hour, 4hour
+- Returns most recent data first (needs `.reverse()` for chart)
+- Date format is `"2024-01-15 09:30:00"` - needs parsing to YYYY-MM-DD
