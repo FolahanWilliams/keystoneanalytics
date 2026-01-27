@@ -378,7 +378,48 @@ serve(async (req) => {
 
       console.log(`Fetching ${symbol} candles: resolution=${candleResolution}, days=${candleDays}`);
 
-      // Primary: Try FMP for historical candles (daily resolution)
+      // PRIMARY: FMP intraday for 1H and 4H resolutions using stable API
+      if (FMP_API_KEY && (candleResolution === "60" || candleResolution === "240")) {
+        try {
+          // FMP stable intraday endpoint format: /stable/historical-chart/{interval}?symbol=AAPL
+          const fmpInterval = candleResolution === "60" ? "1hour" : "4hour";
+          const fmpIntradayRes = await fetch(
+            `https://financialmodelingprep.com/stable/historical-chart/${fmpInterval}?symbol=${encodedSymbol}&apikey=${FMP_API_KEY}`
+          );
+          const fmpIntradayData = await fmpIntradayRes.json();
+          
+          console.log(`FMP intraday ${fmpInterval} response for ${symbol}:`, 
+            JSON.stringify(fmpIntradayData).substring(0, 300));
+          
+          if (Array.isArray(fmpIntradayData) && fmpIntradayData.length > 0) {
+            // Slice to requested number of candles based on days config
+            const maxCandles = candleResolution === "60" ? 48 : 60; // 2 days * 24 or 10 days * 6
+            const slicedData = fmpIntradayData.slice(0, maxCandles).reverse();
+            
+            const candles = slicedData.map((d: any) => ({
+              date: d.date.split(' ')[0], // Extract YYYY-MM-DD from "2024-01-15 09:30:00"
+              timestamp: new Date(d.date).getTime() / 1000,
+              open: d.open,
+              high: d.high,
+              low: d.low,
+              close: d.close,
+              volume: d.volume,
+            }));
+            
+            const payload = { candles, resolution: candleResolution, source: "fmp" };
+            setCache(cacheKey, payload);
+            console.log(`FMP ${fmpInterval} candles for ${symbol}: ${candles.length}`);
+            
+            return new Response(JSON.stringify(payload), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        } catch (fmpError) {
+          console.error(`FMP intraday error for ${symbol}:`, fmpError);
+        }
+      }
+
+      // PRIMARY: FMP for daily/weekly/monthly candles
       if (FMP_API_KEY && (candleResolution === "D" || candleResolution === "W" || candleResolution === "M")) {
         try {
           // Use FMP's stable API endpoint with full OHLC data (not light version)

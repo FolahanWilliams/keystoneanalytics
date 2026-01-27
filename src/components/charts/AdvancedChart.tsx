@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { Loader2, TrendingUp, TrendingDown, Search, AlertCircle, RefreshCw, Crosshair, Settings2 } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Search, AlertCircle, RefreshCw, Crosshair } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { StockSearch } from "@/components/dashboard/StockSearch";
@@ -58,14 +58,22 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
     return Math.max(height, 180);
   }, [showRSI, showMACD]);
 
+  const errorMessage = useMemo(() => {
+    if (error === "no_data") {
+      if (timeframe === "1H" || timeframe === "4H") {
+        return "Intraday data requires a premium subscription. Try Daily, Weekly, or Monthly timeframes.";
+      }
+      return "Market data temporarily unavailable. Try again shortly.";
+    }
+    return `Failed to load chart: ${error}`;
+  }, [error, timeframe]);
+
   if (error) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 p-8">
         <AlertCircle className="w-10 h-10 text-muted-foreground" />
         <p className="text-xs text-muted-foreground text-center max-w-xs">
-          {error === "no_data" 
-            ? "Market data temporarily unavailable. Try again shortly."
-            : `Failed to load chart: ${error}`}
+          {errorMessage}
         </p>
         <Button variant="outline" size="sm" onClick={refetch} className="gap-1.5 h-8 text-xs">
           <RefreshCw className="w-3.5 h-3.5" /> Retry
@@ -166,12 +174,13 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
       </div>
 
       {/* Chart Area */}
-      <div className="flex-1 min-h-0">
-        {loading && enrichedData.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
+      <div className="flex-1 min-h-0 relative">
+        {loading && (
+          <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
-        ) : (
+        )}
+        {enrichedData.length > 0 ? (
           <div className="h-full flex flex-col gap-0">
             <div className="flex-1 min-h-0">
               <PriceChart
@@ -186,6 +195,12 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
             {showRSI && <RSIChart data={enrichedData} height={70} />}
             {showMACD && <MACDChart data={enrichedData} height={85} />}
           </div>
+        ) : (
+          !loading && (
+            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+              No data available for this timeframe
+            </div>
+          )
         )}
       </div>
 
