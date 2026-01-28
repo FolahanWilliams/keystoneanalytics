@@ -146,7 +146,8 @@ function calculateEMA(data: number[], period: number): number {
 // Fetch market data for a symbol using Financial Modeling Prep (primary) with fallbacks
 async function fetchMarketData(symbol: string): Promise<MarketData> {
   const FMP_API_KEY = Deno.env.get("FMP_API_KEY");
-  const FINNHUB_API_KEY = Deno.env.get("FINHUB_API_KEY");
+  // Support both secret names for backward compatibility
+  const FINNHUB_API_KEY = Deno.env.get("FINNHUB_API_KEY") || Deno.env.get("FINHUB_API_KEY");
   const ALPHA_VANTAGE_KEY = Deno.env.get("ALPHA_VANTAGE_API_KEY");
   
   const result: MarketData = { symbol };

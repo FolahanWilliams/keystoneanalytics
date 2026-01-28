@@ -36,8 +36,8 @@ function validateType(type: unknown): type is "quotes" | "candles" | "search" | 
 }
 
 // ======================= In-memory candle cache =======================
-// TTL in milliseconds – keep cached data for 30 seconds to allow quick timeframe switching
-const CACHE_TTL_MS = 30 * 1000;
+// TTL in milliseconds – synchronized with client cache for consistent behavior
+const CACHE_TTL_MS = 60 * 1000; // 60 seconds
 
 interface CacheEntry {
   data: unknown;
@@ -187,7 +187,8 @@ serve(async (req) => {
     }
 
     const FMP_API_KEY = Deno.env.get("FMP_API_KEY");
-    const FINNHUB_API_KEY = Deno.env.get("FINNHUB_API_KEY");
+    // Support both secret names for backward compatibility
+    const FINNHUB_API_KEY = Deno.env.get("FINNHUB_API_KEY") || Deno.env.get("FINHUB_API_KEY");
 
     if (!FMP_API_KEY && !FINNHUB_API_KEY) {
       console.error("No market data API keys configured");
