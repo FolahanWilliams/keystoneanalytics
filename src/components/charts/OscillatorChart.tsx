@@ -9,8 +9,10 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  Area,
 } from "recharts";
 import type { EnrichedCandle, ChartIndicator } from "@/types/market";
+import { cn } from "@/lib/utils";
 
 interface OscillatorChartProps {
   data: EnrichedCandle[];
@@ -18,7 +20,7 @@ interface OscillatorChartProps {
   height?: number;
 }
 
-function RSIChartComponent({ data, height = 100 }: { data: EnrichedCandle[]; height?: number }) {
+function RSIChartComponent({ data, height = 80 }: { data: EnrichedCandle[]; height?: number }) {
   const rsiData = useMemo(() => {
     return data.map(d => ({
       date: d.date,
@@ -26,45 +28,80 @@ function RSIChartComponent({ data, height = 100 }: { data: EnrichedCandle[]; hei
     }));
   }, [data]);
 
+  const currentRSI = data[data.length - 1]?.rsi;
+  const rsiStatus = currentRSI !== undefined 
+    ? currentRSI >= 70 ? "overbought" : currentRSI <= 30 ? "oversold" : "neutral"
+    : "neutral";
+
   return (
-    <div className="border-t border-border/50 pt-2">
-      <div className="flex items-center justify-between px-2 mb-1">
-        <span className="text-xs font-medium text-muted-foreground">RSI (14)</span>
-        <span className="text-xs font-mono">
-          {data[data.length - 1]?.rsi?.toFixed(1) ?? "--"}
-        </span>
+    <div className="border-t border-border/30">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-accent/20">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">RSI</span>
+          <span className="text-[9px] text-muted-foreground/60">(14)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={cn(
+            "text-xs font-mono font-semibold tabular-nums",
+            rsiStatus === "overbought" ? "text-loss" : 
+            rsiStatus === "oversold" ? "text-gain" : "text-foreground"
+          )}>
+            {currentRSI?.toFixed(1) ?? "--"}
+          </span>
+          {rsiStatus !== "neutral" && (
+            <span className={cn(
+              "text-[9px] font-medium px-1.5 py-0.5 rounded",
+              rsiStatus === "overbought" ? "bg-loss/10 text-loss" : "bg-gain/10 text-gain"
+            )}>
+              {rsiStatus === "overbought" ? "Overbought" : "Oversold"}
+            </span>
+          )}
+        </div>
       </div>
       <ResponsiveContainer width="100%" height={height}>
-        <ComposedChart data={rsiData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" vertical={false} />
+        <ComposedChart data={rsiData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="rsiGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.15} />
+              <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--chart-grid))" vertical={false} opacity={0.5} />
           <XAxis dataKey="date" hide />
           <YAxis 
             domain={[0, 100]} 
-            ticks={[30, 50, 70]}
-            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }}
+            ticks={[30, 70]}
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }}
             axisLine={false}
             tickLine={false}
-            width={35}
+            width={28}
           />
           <Tooltip
             contentStyle={{
               backgroundColor: 'hsl(var(--card))',
               border: '1px solid hsl(var(--border))',
-              borderRadius: '6px',
-              fontSize: '11px',
+              borderRadius: '8px',
+              fontSize: '10px',
+              padding: '6px 10px',
             }}
             formatter={(value: number) => [value?.toFixed(1), 'RSI']}
           />
           
           {/* Overbought/Oversold zones */}
-          <ReferenceLine y={70} stroke="hsl(var(--loss))" strokeDasharray="3 3" strokeOpacity={0.5} />
-          <ReferenceLine y={30} stroke="hsl(var(--gain))" strokeDasharray="3 3" strokeOpacity={0.5} />
-          <ReferenceLine y={50} stroke="hsl(var(--muted-foreground))" strokeDasharray="2 2" strokeOpacity={0.3} />
+          <ReferenceLine y={70} stroke="hsl(var(--loss))" strokeDasharray="4 2" strokeOpacity={0.4} strokeWidth={1} />
+          <ReferenceLine y={30} stroke="hsl(var(--gain))" strokeDasharray="4 2" strokeOpacity={0.4} strokeWidth={1} />
           
+          <Area
+            type="monotone"
+            dataKey="rsi"
+            stroke="transparent"
+            fill="url(#rsiGradient)"
+            connectNulls
+          />
           <Line
             type="monotone"
             dataKey="rsi"
-            stroke="hsl(var(--accent))"
+            stroke="hsl(var(--primary))"
             strokeWidth={1.5}
             dot={false}
             connectNulls
@@ -75,7 +112,7 @@ function RSIChartComponent({ data, height = 100 }: { data: EnrichedCandle[]; hei
   );
 }
 
-function MACDChartComponent({ data, height = 120 }: { data: EnrichedCandle[]; height?: number }) {
+function MACDChartComponent({ data, height = 100 }: { data: EnrichedCandle[]; height?: number }) {
   const macdData = useMemo(() => {
     return data.map(d => ({
       date: d.date,
@@ -88,57 +125,70 @@ function MACDChartComponent({ data, height = 120 }: { data: EnrichedCandle[]; he
   }, [data]);
 
   const lastMacd = data[data.length - 1];
+  const isBullish = (lastMacd?.macd ?? 0) > (lastMacd?.macdSignal ?? 0);
 
   return (
-    <div className="border-t border-border/50 pt-2">
-      <div className="flex items-center justify-between px-2 mb-1">
-        <span className="text-xs font-medium text-muted-foreground">MACD (12, 26, 9)</span>
-        <div className="flex gap-3 text-xs font-mono">
-          <span>
-            <span className="text-muted-foreground">MACD:</span>{" "}
-            <span className="text-info">{lastMacd?.macd?.toFixed(2) ?? "--"}</span>
-          </span>
-          <span>
-            <span className="text-muted-foreground">Signal:</span>{" "}
-            <span className="text-warning">{lastMacd?.macdSignal?.toFixed(2) ?? "--"}</span>
+    <div className="border-t border-border/30">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-accent/20">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">MACD</span>
+          <span className="text-[9px] text-muted-foreground/60">(12, 26, 9)</span>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] font-mono">
+          <div className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-info" />
+            <span className="text-muted-foreground">MACD</span>
+            <span className="text-info font-medium tabular-nums">{lastMacd?.macd?.toFixed(2) ?? "--"}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-warning" />
+            <span className="text-muted-foreground">Sig</span>
+            <span className="text-warning font-medium tabular-nums">{lastMacd?.macdSignal?.toFixed(2) ?? "--"}</span>
+          </div>
+          <span className={cn(
+            "text-[9px] font-medium px-1.5 py-0.5 rounded",
+            isBullish ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"
+          )}>
+            {isBullish ? "Bullish" : "Bearish"}
           </span>
         </div>
       </div>
       <ResponsiveContainer width="100%" height={height}>
-        <ComposedChart data={macdData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--chart-grid))" vertical={false} />
+        <ComposedChart data={macdData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="2 2" stroke="hsl(var(--chart-grid))" vertical={false} opacity={0.5} />
           <XAxis dataKey="date" hide />
           <YAxis 
-            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }}
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 8 }}
             axisLine={false}
             tickLine={false}
-            width={35}
+            width={28}
             tickFormatter={(v) => v.toFixed(0)}
           />
           <Tooltip
             contentStyle={{
               backgroundColor: 'hsl(var(--card))',
               border: '1px solid hsl(var(--border))',
-              borderRadius: '6px',
-              fontSize: '11px',
+              borderRadius: '8px',
+              fontSize: '10px',
+              padding: '6px 10px',
             }}
             formatter={(value: number, name: string) => [value?.toFixed(2), name.toUpperCase()]}
           />
           
-          <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.3} />
+          <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeOpacity={0.2} />
           
           {/* Histogram bars */}
           <Bar 
             dataKey="histogramPositive" 
             fill="hsl(var(--gain))" 
-            opacity={0.7}
-            barSize={3}
+            opacity={0.6}
+            radius={[1, 1, 0, 0]}
           />
           <Bar 
             dataKey="histogramNegative" 
             fill="hsl(var(--loss))" 
-            opacity={0.7}
-            barSize={3}
+            opacity={0.6}
+            radius={[0, 0, 1, 1]}
           />
           
           {/* MACD line */}

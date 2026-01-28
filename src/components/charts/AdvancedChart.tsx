@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { StockSearch } from "@/components/dashboard/StockSearch";
 import { ChartToolbar } from "./ChartToolbar";
+import { IndicatorLegend } from "./IndicatorLegend";
 import { PriceChart } from "./PriceChart";
 import { VolumeChart } from "./VolumeChart";
 import { RSIChart, MACDChart } from "./OscillatorChart";
@@ -15,7 +16,8 @@ import {
   defaultIndicators 
 } from "@/hooks/useChartData";
 import { useQuotes } from "@/hooks/useMarketData";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AdvancedChartProps {
   symbol?: string;
@@ -26,7 +28,7 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
   const [timeframe, setTimeframe] = useState<TimeframeType>("1D");
   const [indicators, setIndicators] = useState<ChartIndicator[]>(defaultIndicators);
   const [showSearch, setShowSearch] = useState(false);
-  const [showCrosshair, setShowCrosshair] = useState(false);
+  const [showCrosshair, setShowCrosshair] = useState(true);
 
   const { candles, loading, error, refetch, timeframeConfig } = useChartData(symbol, timeframe);
   const { quotes } = useQuotes([symbol]);
@@ -65,6 +67,7 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
 
   const showRSI = indicators.find(i => i.id === "rsi")?.enabled;
   const showMACD = indicators.find(i => i.id === "macd")?.enabled;
+  const activeOverlays = indicators.filter(i => i.type === "overlay" && i.enabled);
 
   const priceChartHeight = useMemo(() => {
     let height = 320;
@@ -98,154 +101,210 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header - Floating Symbol Chip */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          {showSearch ? (
-            <div className="w-56">
-              <StockSearch onSelect={handleSymbolSelect} placeholder="Search..." showInline />
+    <TooltipProvider delayDuration={300}>
+      <div className="h-full flex flex-col p-4">
+        {/* Compact Header */}
+        <div className="flex items-center justify-between gap-3 mb-3">
+          {/* Left: Symbol & Price */}
+          <div className="flex items-center gap-3">
+            <AnimatePresence mode="wait">
+              {showSearch ? (
+                <motion.div
+                  key="search"
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 200 }}
+                  exit={{ opacity: 0, width: 0 }}
+                  className="overflow-hidden"
+                >
+                  <StockSearch 
+                    onSelect={handleSymbolSelect} 
+                    placeholder="Search..." 
+                    showInline 
+                  />
+                </motion.div>
+              ) : (
+                <motion.button
+                  key="symbol"
+                  onClick={() => setShowSearch(true)}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-accent/60 hover:bg-accent transition-all group"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span className="font-mono text-sm font-bold text-foreground">{symbol}</span>
+                  <Search className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+
+            {!showSearch && (
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-lg font-bold tabular-nums">
+                  ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                <div className={cn(
+                  "flex items-center gap-1 font-mono text-[11px] px-1.5 py-0.5 rounded-md tabular-nums font-medium",
+                  isPositive ? "bg-gain/15 text-gain" : "bg-loss/15 text-loss"
+                )}>
+                  {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                  {isPositive ? "+" : ""}{priceChangePercent.toFixed(2)}%
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Controls */}
+          <div className="flex items-center gap-1.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setShowCrosshair(!showCrosshair)}
+                  className={cn(
+                    "p-1.5 rounded-md transition-colors",
+                    showCrosshair ? "bg-primary/15 text-primary" : "hover:bg-accent text-muted-foreground"
+                  )}
+                >
+                  <Crosshair className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                {showCrosshair ? "Hide" : "Show"} Crosshair
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={refetch}
+                  disabled={loading}
+                  className="p-1.5 rounded-md hover:bg-accent text-muted-foreground transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                Refresh Data
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+
+        {/* Timeframe & Indicators Row */}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          {/* Timeframe Pills */}
+          <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-accent/40">
+            {(["4H", "1D", "1W", "1M", "3M", "1Y"] as TimeframeType[]).map((tf) => (
+              <button
+                key={tf}
+                onClick={() => setTimeframe(tf)}
+                className={cn(
+                  "px-2.5 py-1 text-[10px] font-mono font-semibold rounded-md transition-all",
+                  timeframe === tf
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
+                )}
+              >
+                {tf}
+              </button>
+            ))}
+          </div>
+
+          {/* Active Indicators Legend + Toolbar */}
+          <div className="flex items-center gap-2">
+            {activeOverlays.length > 0 && (
+              <IndicatorLegend indicators={activeOverlays} onToggle={toggleIndicator} />
+            )}
+            <ChartToolbar
+              timeframe={timeframe}
+              onTimeframeChange={setTimeframe}
+              indicators={indicators}
+              onToggleIndicator={toggleIndicator}
+              loading={loading}
+              onRefresh={refetch}
+              showCrosshair={showCrosshair}
+              onToggleCrosshair={() => setShowCrosshair(!showCrosshair)}
+            />
+          </div>
+        </div>
+
+        {/* Chart Area */}
+        <div className="flex-1 min-h-0 relative rounded-lg overflow-hidden bg-[hsl(var(--chart-bg))]">
+          <AnimatePresence>
+            {loading && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-background/60 backdrop-blur-sm flex items-center justify-center z-10"
+              >
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-card/80 border border-border">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  <span className="text-xs text-muted-foreground">Loading...</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {hasInsufficientData && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-warning/10 text-warning text-[10px] px-2 py-1 rounded-md border border-warning/20"
+            >
+              <AlertTriangle className="w-3 h-3" />
+              <span>Need {minDataRequired} bars for indicators ({candles.length} available)</span>
+            </motion.div>
+          )}
+
+          {enrichedData.length > 0 ? (
+            <div className="h-full flex flex-col">
+              <div className="flex-1 min-h-0">
+                <PriceChart
+                  data={enrichedData}
+                  currentPrice={currentPrice}
+                  indicators={indicators}
+                  showCrosshair={showCrosshair}
+                  height={priceChartHeight}
+                />
+              </div>
+              <VolumeChart data={enrichedData} height={40} />
+              {showRSI && <RSIChart data={enrichedData} height={65} />}
+              {showMACD && <MACDChart data={enrichedData} height={80} />}
             </div>
           ) : (
-            <motion.button
-              onClick={() => setShowSearch(true)}
-              className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-accent/50 hover:bg-accent transition-colors group"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <span className="font-mono text-base font-bold text-foreground">{symbol}</span>
-              {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
-              <Search className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-            </motion.button>
-          )}
-          
-          {!showSearch && (
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xl font-bold tabular-nums">
-                ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-              <span className={cn(
-                "flex items-center gap-1 font-mono text-xs px-2 py-1 rounded-lg tabular-nums",
-                isPositive ? "bg-gain/10 text-gain" : "bg-loss/10 text-loss"
-              )}>
-                {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                {isPositive ? "+" : ""}{priceChangePercent.toFixed(2)}%
-              </span>
-            </div>
+            !loading && (
+              <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                No data available for this timeframe
+              </div>
+            )
           )}
         </div>
 
-        {/* Mini Toolbar */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setShowCrosshair(!showCrosshair)}
-            className={cn(
-              "p-2 rounded-lg transition-colors",
-              showCrosshair ? "bg-primary/10 text-primary" : "hover:bg-accent text-muted-foreground"
-            )}
-          >
-            <Crosshair className="w-4 h-4" />
-          </button>
-          <button
-            onClick={refetch}
-            disabled={loading}
-            className="p-2 rounded-lg hover:bg-accent text-muted-foreground transition-colors"
-          >
-            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
-          </button>
-        </div>
-      </div>
-
-      {/* Timeframe Pills */}
-      <div className="flex items-center gap-1 mb-3">
-        {(["4H", "1D", "1W", "1M", "3M", "1Y"] as TimeframeType[]).map((tf) => (
-          <button
-            key={tf}
-            onClick={() => setTimeframe(tf)}
-            className={cn(
-              "px-3 py-1.5 text-[11px] font-mono font-medium rounded-lg transition-all",
-              timeframe === tf
-                ? "bg-primary text-primary-foreground"
-                : "bg-accent/50 hover:bg-accent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {tf}
-          </button>
-        ))}
-        
-        <div className="flex-1" />
-        
-        {/* Indicators button */}
-        <ChartToolbar
-          timeframe={timeframe}
-          onTimeframeChange={setTimeframe}
-          indicators={indicators}
-          onToggleIndicator={toggleIndicator}
-          loading={loading}
-          onRefresh={refetch}
-          showCrosshair={showCrosshair}
-          onToggleCrosshair={() => setShowCrosshair(!showCrosshair)}
-        />
-      </div>
-
-      {/* Chart Area */}
-      <div className="flex-1 min-h-0 relative">
-        {loading && (
-          <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          </div>
-        )}
-        {hasInsufficientData && (
-          <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5 bg-warning/10 text-warning text-xs px-2.5 py-1.5 rounded-lg border border-warning/20">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Insufficient data for indicators ({candles.length}/{minDataRequired} bars)</span>
-          </div>
-        )}
-        {enrichedData.length > 0 ? (
-          <div className="h-full flex flex-col gap-0">
-            <div className="flex-1 min-h-0">
-              <PriceChart
-                data={enrichedData}
-                currentPrice={currentPrice}
-                indicators={indicators}
-                showCrosshair={showCrosshair}
-                height={priceChartHeight}
-              />
+        {/* Footer Stats */}
+        {quote && (
+          <div className="flex items-center gap-4 mt-3 pt-2.5 border-t border-border/40 text-[10px] font-mono">
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground uppercase tracking-wide">H</span>
+              <span className="text-gain font-medium tabular-nums">${quote.high.toFixed(2)}</span>
             </div>
-            <VolumeChart data={enrichedData} height={44} />
-            {showRSI && <RSIChart data={enrichedData} height={70} />}
-            {showMACD && <MACDChart data={enrichedData} height={85} />}
-          </div>
-        ) : (
-          !loading && (
-            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-              No data available for this timeframe
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground uppercase tracking-wide">L</span>
+              <span className="text-loss font-medium tabular-nums">${quote.low.toFixed(2)}</span>
             </div>
-          )
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground uppercase tracking-wide">O</span>
+              <span className="font-medium tabular-nums">${quote.open.toFixed(2)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-muted-foreground uppercase tracking-wide">Prev</span>
+              <span className="font-medium tabular-nums">${quote.previousClose.toFixed(2)}</span>
+            </div>
+            <div className="ml-auto text-muted-foreground">
+              {timeframeConfig.label}
+            </div>
+          </div>
         )}
       </div>
-
-      {/* Footer Stats */}
-      {quote && (
-        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/50 text-[10px] font-mono">
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">H</span>
-            <span className="text-gain tabular-nums">${quote.high.toFixed(2)}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">L</span>
-            <span className="text-loss tabular-nums">${quote.low.toFixed(2)}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">O</span>
-            <span className="tabular-nums">${quote.open.toFixed(2)}</span>
-          </div>
-          <div className="ml-auto flex items-center gap-1.5">
-            <span className="text-muted-foreground">{timeframeConfig.label}</span>
-          </div>
-        </div>
-      )}
-    </div>
+    </TooltipProvider>
   );
 }
 
