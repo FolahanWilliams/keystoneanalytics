@@ -29,7 +29,8 @@ export interface SearchResult {
   type: string;
 }
 
-export type TimeframeType = "1H" | "4H" | "1D" | "1W" | "1M";
+// Updated: Removed 1H (unreliable), added 3M and 1Y
+export type TimeframeType = "4H" | "1D" | "1W" | "1M" | "3M" | "1Y";
 
 export interface EnrichedCandle extends Candle {
   isUp: boolean;

@@ -54,10 +54,11 @@ serve(async (req) => {
       );
     }
 
-    const FINNHUB_API_KEY = Deno.env.get("FINHUB_API_KEY");
+    // Support both secret names for backward compatibility
+    const FINNHUB_API_KEY = Deno.env.get("FINNHUB_API_KEY") || Deno.env.get("FINHUB_API_KEY");
     
     if (!FINNHUB_API_KEY) {
-      console.error("FINHUB_API_KEY is not configured");
+      console.error("FINNHUB_API_KEY is not configured");
       return new Response(
         JSON.stringify({ error: "Service configuration error" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

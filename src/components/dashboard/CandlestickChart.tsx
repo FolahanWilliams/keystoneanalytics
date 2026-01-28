@@ -22,7 +22,7 @@ interface CandlestickChartProps {
   onSymbolChange?: (symbol: string) => void;
 }
 
-const timeframes: TimeframeType[] = ["1H", "4H", "1D", "1W", "1M"];
+const timeframes: TimeframeType[] = ["4H", "1D", "1W", "1M", "3M", "1Y"];
 
 const CandlestickChart = memo(function CandlestickChart({ symbol = "AAPL", onSymbolChange }: CandlestickChartProps) {
   const [selectedTf, setSelectedTf] = useState<TimeframeType>("1D");

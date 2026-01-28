@@ -17,8 +17,8 @@ export type { Candle, TimeframeType, ChartIndicator, EnrichedCandle };
 export { timeframeConfig };
 export { defaultIndicators } from "@/config/indicators";
 
-// Client-side cache for candle data - shorter TTL to ensure fresh data on timeframe switch
-const candleCache = new DataCache<Candle[]>(30_000);
+// Client-side cache for candle data - synchronized with server cache TTL
+const candleCache = new DataCache<Candle[]>(60_000); // 60 seconds - matches edge function cache
 
 export function useChartData(symbol: string, timeframe: TimeframeType) {
   const [candles, setCandles] = useState<Candle[]>([]);

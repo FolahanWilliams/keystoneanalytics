@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { Loader2, TrendingUp, TrendingDown, Search, AlertCircle, RefreshCw, Crosshair } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Search, AlertCircle, RefreshCw, Crosshair, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { StockSearch } from "@/components/dashboard/StockSearch";
@@ -39,6 +39,21 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
 
   const enrichedData = useEnrichedChartData(candles, indicators);
 
+  // Calculate minimum data required for enabled indicators
+  const minDataRequired = useMemo(() => {
+    let min = 1;
+    if (indicators.find(i => i.id === "sma20")?.enabled) min = Math.max(min, 20);
+    if (indicators.find(i => i.id === "sma50")?.enabled) min = Math.max(min, 50);
+    if (indicators.find(i => i.id === "rsi")?.enabled) min = Math.max(min, 14);
+    if (indicators.find(i => i.id === "macd")?.enabled) min = Math.max(min, 26);
+    if (indicators.find(i => i.id === "bb")?.enabled) min = Math.max(min, 20);
+    if (indicators.find(i => i.id === "ema12")?.enabled) min = Math.max(min, 12);
+    if (indicators.find(i => i.id === "ema26")?.enabled) min = Math.max(min, 26);
+    return min;
+  }, [indicators]);
+
+  const hasInsufficientData = candles.length > 0 && candles.length < minDataRequired;
+
   const toggleIndicator = useCallback((id: string) => {
     setIndicators(prev => prev.map(ind => ind.id === id ? { ...ind, enabled: !ind.enabled } : ind));
   }, []);
@@ -60,7 +75,7 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
 
   const errorMessage = useMemo(() => {
     if (error === "no_data") {
-      if (timeframe === "1H" || timeframe === "4H") {
+      if (timeframe === "4H") {
         return "Intraday data requires a premium subscription. Try Daily, Weekly, or Monthly timeframes.";
       }
       return "Market data temporarily unavailable. Try again shortly.";
@@ -143,7 +158,7 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
 
       {/* Timeframe Pills */}
       <div className="flex items-center gap-1 mb-3">
-        {(["1H", "4H", "1D", "1W", "1M"] as TimeframeType[]).map((tf) => (
+        {(["4H", "1D", "1W", "1M", "3M", "1Y"] as TimeframeType[]).map((tf) => (
           <button
             key={tf}
             onClick={() => setTimeframe(tf)}
@@ -178,6 +193,12 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
         {loading && (
           <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          </div>
+        )}
+        {hasInsufficientData && (
+          <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5 bg-warning/10 text-warning text-xs px-2.5 py-1.5 rounded-lg border border-warning/20">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span>Insufficient data for indicators ({candles.length}/{minDataRequired} bars)</span>
           </div>
         )}
         {enrichedData.length > 0 ? (
