@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -18,37 +19,94 @@ interface SubscriptionEmailRequest {
   periodEnd?: string;
 }
 
+// HTML escape function to prevent injection
+function escapeHtml(text: string): string {
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
+}
+
+// Email validation
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 255;
+}
+
+// Valid email types
+const validEmailTypes: EmailType[] = ["confirmation", "cancellation", "payment_failed"];
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // JWT Authentication check
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { email, displayName, type, tier = "Pro", periodEnd }: SubscriptionEmailRequest = await req.json();
 
-    if (!email || !type) {
+    // Validate email
+    if (!email || !isValidEmail(email)) {
       return new Response(
-        JSON.stringify({ error: "Email and type are required" }),
+        JSON.stringify({ error: "Valid email is required" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
-    const name = displayName || "Trader";
+    // Validate email type
+    if (!type || !validEmailTypes.includes(type)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid email type" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Sanitize inputs to prevent HTML injection
+    const safeName = displayName ? escapeHtml(displayName.slice(0, 100)) : "Trader";
+    const safeTier = escapeHtml((tier || "Pro").slice(0, 20));
+
     let subject: string;
     let htmlContent: string;
 
     switch (type) {
       case "confirmation":
-        subject = `Welcome to Keystone Analytics ${tier}! 🚀`;
-        htmlContent = getConfirmationEmail(name, tier);
+        subject = `Welcome to Keystone Analytics ${safeTier}! 🚀`;
+        htmlContent = getConfirmationEmail(safeName, safeTier);
         break;
       case "cancellation":
         subject = "Your Keystone Analytics Subscription Has Been Cancelled";
-        htmlContent = getCancellationEmail(name, periodEnd);
+        htmlContent = getCancellationEmail(safeName, periodEnd);
         break;
       case "payment_failed":
         subject = "Action Required: Payment Failed for Keystone Analytics";
-        htmlContent = getPaymentFailedEmail(name);
+        htmlContent = getPaymentFailedEmail(safeName);
         break;
       default:
         return new Response(

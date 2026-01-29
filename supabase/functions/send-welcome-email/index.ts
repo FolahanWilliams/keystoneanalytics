@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -13,22 +14,66 @@ interface WelcomeEmailRequest {
   displayName?: string;
 }
 
+// HTML escape function to prevent injection
+function escapeHtml(text: string): string {
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
+}
+
+// Email validation
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 255;
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // JWT Authentication check
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { email, displayName }: WelcomeEmailRequest = await req.json();
 
-    if (!email) {
+    // Validate email
+    if (!email || !isValidEmail(email)) {
       return new Response(
-        JSON.stringify({ error: "Email is required" }),
+        JSON.stringify({ error: "Valid email is required" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 
-    const name = displayName || "Trader";
+    // Sanitize display name to prevent HTML injection
+    const safeName = displayName ? escapeHtml(displayName.slice(0, 100)) : "Trader";
 
     const emailResponse = await resend.emails.send({
       from: "Keystone Analytics <noreply@keystoneanalytics.org>",
@@ -48,7 +93,7 @@ const handler = async (req: Request): Promise<Response> => {
               <p style="color: #71717a; margin-top: 8px; font-size: 14px;">Intelligent Market Analysis</p>
             </div>
             
-            <h2 style="font-size: 22px; margin-bottom: 16px; color: #fff;">Welcome, ${name}! 🎉</h2>
+            <h2 style="font-size: 22px; margin-bottom: 16px; color: #fff;">Welcome, ${safeName}! 🎉</h2>
             
             <p style="color: #a1a1aa; line-height: 1.6; margin-bottom: 24px;">
               You've just joined thousands of traders who use Keystone Analytics to make smarter, data-driven trading decisions. We're excited to have you on board!

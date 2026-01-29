@@ -15,13 +15,52 @@ interface TrialExpiryRequest {
   sendToAll?: boolean;
 }
 
+// HTML escape function to prevent injection
+function escapeHtml(text: string): string {
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // JWT Authentication check
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { userId, daysRemaining = 3, sendToAll = false }: TrialExpiryRequest = await req.json();
+
+    // Validate daysRemaining
+    const safeDaysRemaining = Math.min(Math.max(1, daysRemaining), 30);
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -34,7 +73,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (sendToAll) {
       // Find users whose trial is expiring soon
       const expiryDate = new Date();
-      expiryDate.setDate(expiryDate.getDate() + daysRemaining);
+      expiryDate.setDate(expiryDate.getDate() + safeDaysRemaining);
       
       const { data: subscriptions, error: subError } = await supabaseAdmin
         .from("user_subscriptions")
@@ -64,6 +103,15 @@ const handler = async (req: Request): Promise<Response> => {
         }
       }
     } else if (userId) {
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(userId)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid user ID format" }),
+          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
       const { data: userData } = await supabaseAdmin.auth.admin.getUserById(userId);
       if (userData?.user?.email) {
         const { data: profile } = await supabaseAdmin
@@ -82,12 +130,13 @@ const handler = async (req: Request): Promise<Response> => {
     const results = [];
 
     for (const user of usersToNotify) {
-      const name = user.displayName || "Trader";
+      // Sanitize display name to prevent HTML injection
+      const safeName = user.displayName ? escapeHtml(user.displayName.slice(0, 100)) : "Trader";
       
       const emailResponse = await resend.emails.send({
         from: "Keystone Analytics <noreply@keystoneanalytics.org>",
         to: [user.email],
-        subject: `Your Keystone Analytics trial expires in ${daysRemaining} days`,
+        subject: `Your Keystone Analytics trial expires in ${safeDaysRemaining} days`,
         html: `
           <!DOCTYPE html>
           <html>
@@ -101,10 +150,10 @@ const handler = async (req: Request): Promise<Response> => {
                 <h1 style="color: #10b981; font-size: 28px; margin: 0;">Keystone Analytics</h1>
               </div>
               
-              <h2 style="font-size: 20px; margin-bottom: 16px; color: #fff;">Hi ${name}, Your Trial is Ending Soon</h2>
+              <h2 style="font-size: 20px; margin-bottom: 16px; color: #fff;">Hi ${safeName}, Your Trial is Ending Soon</h2>
               
               <p style="color: #a1a1aa; line-height: 1.6; margin-bottom: 24px;">
-                Your free trial of Keystone Analytics will expire in <strong style="color: #f59e0b;">${daysRemaining} days</strong>. Don't lose access to:
+                Your free trial of Keystone Analytics will expire in <strong style="color: #f59e0b;">${safeDaysRemaining} days</strong>. Don't lose access to:
               </p>
               
               <ul style="color: #a1a1aa; line-height: 1.8; margin-bottom: 24px; padding-left: 20px;">
