@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { rateLimitMiddleware, RATE_LIMITS } from "../_shared/rateLimit.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -80,6 +81,20 @@ serve(async (req) => {
         JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Get user ID for rate limiting
+    const userId = claimsData.claims.sub as string;
+
+    // Apply rate limiting for AI features
+    const rateLimitResponse = rateLimitMiddleware(
+      req,
+      RATE_LIMITS.AI_FEATURES,
+      corsHeaders,
+      userId
+    );
+    if (rateLimitResponse) {
+      return rateLimitResponse;
     }
 
     const { topic, context, level = "beginner" }: EducationRequest = await req.json();

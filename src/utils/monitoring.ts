@@ -11,6 +11,9 @@ const VITALS_THRESHOLDS = {
 
 type MetricName = keyof typeof VITALS_THRESHOLDS;
 
+// Severity levels for error tracking
+export type Severity = 'info' | 'warning' | 'error' | 'critical';
+
 interface PerformanceMetric {
   name: string;
   value: number;
@@ -24,11 +27,27 @@ interface ErrorReport {
   componentStack?: string;
   url: string;
   timestamp: string;
+  severity?: Severity;
+}
+
+interface ApiErrorReport {
+  provider: string;
+  endpoint?: string;
+  statusCode?: number;
+  message: string;
+  retryCount?: number;
+  degraded?: boolean;
+  timestamp: string;
+  severity: Severity;
 }
 
 // Rate limiting for metrics
 const sentMetrics = new Set<string>();
 const METRIC_COOLDOWN = 60000; // 1 minute cooldown per metric type
+
+// Error aggregation for rate limiting
+const errorCounts = new Map<string, { count: number; lastTime: number }>();
+const ERROR_AGGREGATION_WINDOW = 5000; // 5 seconds
 
 function getRating(name: MetricName, value: number): 'good' | 'needs-improvement' | 'poor' {
   const thresholds = VITALS_THRESHOLDS[name];
@@ -47,7 +66,7 @@ function deferWork(callback: () => void) {
   }
 }
 
-async function sendMetric(type: 'error' | 'performance' | 'event', name: string, value: object) {
+async function sendMetric(type: 'error' | 'performance' | 'event' | 'api_error', name: string, value: object) {
   // Only send in production
   if (import.meta.env.DEV) {
     console.log(`[Monitoring ${type}]`, name, value);
@@ -75,16 +94,64 @@ async function sendMetric(type: 'error' | 'performance' | 'event', name: string,
   });
 }
 
-export function reportError(error: Error, componentStack?: string) {
+/**
+ * Report a runtime error with optional severity
+ */
+export function reportError(error: Error, componentStack?: string, severity: Severity = 'error') {
   const report: ErrorReport = {
     message: error.message,
     stack: error.stack,
     componentStack,
     url: window.location.href,
     timestamp: new Date().toISOString(),
+    severity,
   };
 
   sendMetric('error', 'runtime_error', report);
+}
+
+/**
+ * Report an API-specific error with provider information
+ */
+export function reportApiError(
+  provider: string,
+  message: string,
+  options: {
+    endpoint?: string;
+    statusCode?: number;
+    retryCount?: number;
+    degraded?: boolean;
+    severity?: Severity;
+  } = {}
+) {
+  // Aggregate similar errors to prevent flooding
+  const errorKey = `${provider}:${options.endpoint || 'unknown'}:${options.statusCode || 0}`;
+  const now = Date.now();
+  const existing = errorCounts.get(errorKey);
+  
+  if (existing && now - existing.lastTime < ERROR_AGGREGATION_WINDOW) {
+    existing.count++;
+    existing.lastTime = now;
+    // Only send aggregated error every 5th occurrence
+    if (existing.count % 5 !== 0) {
+      return;
+    }
+  } else {
+    errorCounts.set(errorKey, { count: 1, lastTime: now });
+  }
+
+  const report: ApiErrorReport = {
+    provider,
+    endpoint: options.endpoint,
+    statusCode: options.statusCode,
+    message,
+    retryCount: options.retryCount,
+    degraded: options.degraded,
+    timestamp: new Date().toISOString(),
+    severity: options.severity || 'error',
+  };
+
+  sendMetric('api_error', `api_error_${provider}`, report);
 }
 
 export function reportPerformanceMetric(metric: PerformanceMetric) {
@@ -102,6 +169,22 @@ export function reportPerformanceMetric(metric: PerformanceMetric) {
 
 export function reportEvent(name: string, properties?: object) {
   sendMetric('event', name, properties || {});
+}
+
+/**
+ * Report a UI interaction event
+ */
+export function reportUIEvent(
+  action: string,
+  component: string,
+  properties?: object
+) {
+  sendMetric('event', 'ui_interaction', {
+    action,
+    component,
+    ...properties,
+    timestamp: new Date().toISOString(),
+  });
 }
 
 // Initialize Core Web Vitals tracking
