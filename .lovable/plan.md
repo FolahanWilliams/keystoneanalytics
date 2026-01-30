@@ -1,257 +1,274 @@
 
-# Production Readiness Roadmap for Keystone Analytics
 
-## Executive Summary
+# Priority 3: Performance & Reliability Implementation Plan
 
-Keystone Analytics is a well-architected stock trading intelligence platform with a solid foundation including authentication, subscription billing (Stripe), charting (lightweight-charts), AI-powered analysis, and an educational academy. This roadmap outlines the remaining work to achieve a fully functional production model.
+## Overview
 
----
-
-## Current State Assessment
-
-### What's Already Built ✅
-
-| Category | Status | Details |
-|----------|--------|---------|
-| **Authentication** | Complete | Email/password signup, password reset, session management |
-| **Subscription Billing** | Complete | Stripe integration, Pro/Elite tiers, webhook handling, customer portal |
-| **Market Data** | Functional | FMP, Finnhub, Alpha Vantage integrations for quotes and charts |
-| **Charting** | Functional | Candlestick, volume, RSI, MACD, SMA, EMA, Bollinger Bands |
-| **AI Features** | Functional | Stock Coach chat, Decision Engine, AI Tutor |
-| **Academy** | Complete | 4-level learning path, quizzes, progress tracking |
-| **Watchlists** | Complete | CRUD operations with subscription-based limits |
-| **News Feed** | Functional | Real-time financial news integration |
-| **Settings** | Complete | Profile, notifications, theme, password change |
+This plan implements four key reliability improvements: rate limiting for edge functions, enhanced error monitoring, a robust API fallback strategy with circuit breaker pattern, and database query optimization through strategic indexes.
 
 ---
 
-## Priority 1: Critical Security Fixes (Must Have Before Launch)
+## Current State Analysis
 
-### 1.1 Email Endpoint Authentication
-**Severity: HIGH** | **Effort: 2-3 hours**
+### Existing Infrastructure
+- **Monitoring System**: `src/utils/monitoring.ts` already captures Core Web Vitals and runtime errors
+- **Error Boundary**: `src/components/common/ErrorBoundary.tsx` catches React errors and reports to monitoring
+- **Caching**: Client-side `DataCache` utility and in-memory edge function caching exist
+- **API Fallbacks**: Basic provider chaining in market-data (FMP → Finnhub → Alpha Vantage)
 
-Three edge functions accept requests without authentication:
-- `send-welcome-email`
-- `send-subscription-email`
-- `send-trial-expiry`
+### Gaps Identified
+1. **No rate limiting** on any edge functions
+2. **No circuit breaker** for failing API providers
+3. **No graceful degradation UI** when APIs fail
+4. **Missing database indexes** on frequently queried columns
+5. **No admin visibility** into collected metrics
+
+---
+
+## Implementation Details
+
+### Task 1: Rate Limiting Middleware for Edge Functions
+
+Create a reusable rate limiting module in `supabase/functions/_shared/`:
+
+**File: `supabase/functions/_shared/rateLimit.ts`**
 
 ```text
-Impact: Anyone can trigger email sends, enabling spam/phishing attacks
-Fix: Add JWT token verification to all email edge functions
+Rate Limiter Features:
+- In-memory token bucket per user/IP
+- Configurable limits per function type
+- Returns 429 with Retry-After header when exceeded
+- Sliding window to prevent burst abuse
 ```
 
-### 1.2 Fix AI Tutor Authentication Token
-**Severity: HIGH** | **Effort: 30 minutes**
+**Default Rate Limits:**
+| Function Type | Limit | Window |
+|--------------|-------|--------|
+| Market Data | 60 req | 1 min |
+| AI Features | 10 req | 1 min |
+| Email Sends | 5 req | 1 min |
+| Search | 30 req | 1 min |
 
-The `KeystoneTutorChat` component sends the Supabase publishable key instead of the user's JWT:
+**Integration:** Add rate limit check at the start of each edge function after auth validation.
+
+**Files to modify:**
+- Create: `supabase/functions/_shared/rateLimit.ts`
+- Update: `market-data/index.ts`, `stock-coach/index.ts`, `pulse-tutor/index.ts`, `education/index.ts`
+
+---
+
+### Task 2: Enhanced Error Monitoring Integration
+
+**2.1 Extend the monitoring utility with structured error categories:**
+
+**File: `src/utils/monitoring.ts` (updates)**
+- Add `reportApiError()` for API-specific errors with provider info
+- Add `reportUIEvent()` for user interaction tracking
+- Add severity levels (info, warning, error, critical)
+- Include retry count and degradation state
+
+**2.2 Create API error hooks for frontend:**
+
+**File: `src/hooks/useApiHealth.ts` (new)**
 ```text
-Current: Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
-Should be: Authorization: `Bearer ${session.access_token}`
+Features:
+- Track API health state per provider
+- Expose degradation state to UI components
+- Aggregate error rates over rolling window
+- Trigger alerts when threshold exceeded
 ```
 
-### 1.3 Email Input Validation
-**Severity: MEDIUM** | **Effort: 1 hour**
+**2.3 UI Degradation Banner Component:**
 
-Add email format validation and HTML sanitization for display names in email templates to prevent injection attacks.
+**File: `src/components/common/ApiStatusBanner.tsx` (new)**
+```text
+Shows when:
+- Market data provider is degraded
+- AI features are rate limited
+- System is in fallback mode
+```
 
-### 1.4 Academy Quizzes RLS Policy
-**Severity: LOW** | **Effort: 15 minutes**
+---
 
-Add explicit anonymous blocking policy to `academy_quizzes` table:
+### Task 3: Circuit Breaker Pattern for API Fallbacks
+
+**3.1 Create circuit breaker utility:**
+
+**File: `supabase/functions/_shared/circuitBreaker.ts` (new)**
+
+```text
+Circuit Breaker States:
+- CLOSED: Normal operation, requests pass through
+- OPEN: Provider failing, skip requests, return fallback
+- HALF_OPEN: Testing if provider recovered
+
+Configuration:
+- Failure threshold: 5 consecutive failures
+- Reset timeout: 60 seconds
+- Success threshold: 2 successes to close
+```
+
+**3.2 Implement retry with exponential backoff:**
+
+**File: `supabase/functions/_shared/retry.ts` (new)**
+
+```text
+Retry Configuration:
+- Max retries: 3
+- Initial delay: 500ms
+- Max delay: 5000ms
+- Backoff multiplier: 2
+- Jitter: 100ms random
+```
+
+**3.3 Update market-data function with circuit breaker:**
+
+The market-data function will use circuit breakers for each provider:
+- FMP circuit breaker
+- Finnhub circuit breaker
+- Alpha Vantage circuit breaker
+
+When a provider is "OPEN", skip it immediately and try next provider.
+
+---
+
+### Task 4: Database Query Optimization
+
+**4.1 Add performance indexes via migration:**
+
+**Analysis of query patterns:**
+| Table | Common Query Pattern | Index Needed |
+|-------|---------------------|--------------|
+| `watchlist` | `WHERE user_id = X` | ✓ Exists (primary key) |
+| `academy_progress` | `WHERE user_id = X AND module_id = Y` | Composite index |
+| `academy_quizzes` | `WHERE user_id = X ORDER BY completed_at DESC` | Composite index |
+| `app_metrics` | `WHERE type = X AND created_at > Y` | Composite index |
+| `user_subscriptions` | `WHERE stripe_customer_id = X` | Index on stripe_customer_id |
+| `profiles` | `WHERE user_id = X` | ✓ Exists (unique) |
+
+**Migration SQL:**
 ```sql
-CREATE POLICY "Block anonymous reads on academy_quizzes"
-ON public.academy_quizzes FOR SELECT
-USING (auth.uid() IS NOT NULL);
+-- Optimize academy progress lookups
+CREATE INDEX IF NOT EXISTS idx_academy_progress_user_module 
+ON public.academy_progress (user_id, module_id);
+
+-- Optimize quiz history queries
+CREATE INDEX IF NOT EXISTS idx_academy_quizzes_user_completed 
+ON public.academy_quizzes (user_id, completed_at DESC);
+
+-- Optimize metrics analysis
+CREATE INDEX IF NOT EXISTS idx_app_metrics_type_created 
+ON public.app_metrics (type, created_at DESC);
+
+-- Optimize Stripe webhook lookups
+CREATE INDEX IF NOT EXISTS idx_user_subscriptions_stripe_customer 
+ON public.user_subscriptions (stripe_customer_id);
 ```
 
 ---
 
-## Priority 2: Core Functionality Gaps
+## File Changes Summary
 
-### 2.1 Price Alerts System
-**Status: Not Implemented** | **Effort: 1-2 days**
+### New Files
+| File | Purpose |
+|------|---------|
+| `supabase/functions/_shared/rateLimit.ts` | Token bucket rate limiter |
+| `supabase/functions/_shared/circuitBreaker.ts` | Circuit breaker for API providers |
+| `supabase/functions/_shared/retry.ts` | Exponential backoff utility |
+| `src/hooks/useApiHealth.ts` | Frontend API health tracking |
+| `src/components/common/ApiStatusBanner.tsx` | Degradation notification UI |
 
-Currently shown in pricing but not functional. Requires:
-- Database table for user alerts
-- Background job/cron to check price conditions
-- Push notification delivery (web push or email)
-- UI for managing alerts in Settings
+### Modified Files
+| File | Changes |
+|------|---------|
+| `supabase/functions/market-data/index.ts` | Add rate limiting, circuit breaker |
+| `supabase/functions/stock-coach/index.ts` | Add rate limiting |
+| `supabase/functions/pulse-tutor/index.ts` | Add rate limiting |
+| `supabase/functions/education/index.ts` | Add rate limiting |
+| `src/utils/monitoring.ts` | Add API error reporting, severity levels |
+| `src/components/charts/AdvancedChart.tsx` | Show degradation state |
+| `src/App.tsx` | Add ApiStatusBanner component |
 
-### 2.2 Intraday Chart Data
-**Status: Limited** | **Effort: 4-6 hours**
-
-FMP free tier restricts intraday data. Options:
-1. **Upgrade FMP plan** to premium tier for 1H/4H data
-2. **Alternative provider**: Polygon.io, Twelve Data, or Yahoo Finance API
-3. **Hybrid approach**: Use free EOD data + premium for intraday during market hours
-
-### 2.3 Chart Drawing Tools
-**Status: Not Implemented** | **Effort: 2-3 days**
-
-Production trading platforms need:
-- Trend lines
-- Fibonacci retracements
-- Horizontal support/resistance levels
-- Annotations/notes
-- Drawing persistence (save to database)
-
-### 2.4 Mobile Responsiveness Audit
-**Status: Partial** | **Effort: 1-2 days**
-
-Full responsive testing needed for:
-- Chart touch interactions
-- Sidebar collapse behavior
-- Analysis page layout on tablets
-- Modal/dialog sizing on small screens
+### Database Migration
+| Migration | Purpose |
+|-----------|---------|
+| `20260130_performance_indexes.sql` | Add composite indexes for common queries |
 
 ---
 
-## Priority 3: Performance & Reliability
+## Technical Implementation Notes
 
-### 3.1 Rate Limiting
-**Effort: 2-4 hours**
+### Rate Limiter Design
 
-Implement rate limiting on edge functions to prevent abuse:
-- API key-based limits for market data functions
-- User-based limits for AI features
-- IP-based limits for unauthenticated endpoints
+```text
+Token Bucket Algorithm:
+- Each user/IP gets a bucket with X tokens
+- Tokens replenish at rate of X per window
+- Each request consumes 1 token
+- If no tokens available, return 429
 
-### 3.2 Error Monitoring
-**Effort: 2-3 hours**
+Storage: In-memory Map with cleanup of expired entries
+Memory Limit: Max 10,000 buckets, LRU eviction
+```
 
-The `app_metrics` table exists but needs:
-- Frontend integration to capture errors systematically
-- Dashboard/admin view for monitoring
-- Alert triggers for error spikes
+### Circuit Breaker State Machine
 
-### 3.3 API Key Fallback Strategy
-**Effort: 1-2 hours**
+```text
+┌─────────┐  failures >= 5  ┌────────┐
+│ CLOSED  │────────────────>│  OPEN  │
+└─────────┘                 └────────┘
+     ▲                           │
+     │ successes >= 2            │ timeout (60s)
+     │                           ▼
+     │                      ┌──────────┐
+     └──────────────────────│HALF_OPEN │
+                            └──────────┘
+```
 
-Current implementation has fallback chains but could be more robust:
-- Retry logic with exponential backoff
-- Circuit breaker pattern for failing providers
-- Graceful degradation UI messaging
+### API Health Hook Usage
 
-### 3.4 Database Query Optimization
-**Effort: 2-4 hours**
+```typescript
+// In chart components
+const { isProviderHealthy, degradedProviders } = useApiHealth();
 
-- Review indexes on frequently queried tables
-- Analyze slow queries in Supabase logs
-- Add composite indexes for common filter patterns
-
----
-
-## Priority 4: Feature Completion
-
-### 4.1 Two-Factor Authentication
-**Status: Placeholder** | **Effort: 4-6 hours**
-
-Currently shows "Coming Soon" toast. Implement using:
-- Supabase MFA with TOTP
-- Backup codes
-- Recovery flow
-
-### 4.2 Chart Sharing
-**Status: Partial** | **Effort: 4-6 hours**
-
-`ChartShareButton` exists but needs:
-- Server-side image generation for social previews
-- Shareable URL with chart configuration
-- Public chart view page
-
-### 4.3 Portfolio Tracking
-**Status: Not Implemented** | **Effort: 2-3 days**
-
-Add ability to:
-- Track owned positions
-- Calculate P&L
-- Performance visualization over time
-
-### 4.4 Earnings Calendar
-**Status: Listed but not visible** | **Effort: 1 day**
-
-Add earnings calendar widget showing:
-- Upcoming earnings for watchlist stocks
-- Earnings surprises history
-- Estimates vs actuals
+if (!isProviderHealthy('market-data')) {
+  return <DegradedDataWarning providers={degradedProviders} />;
+}
+```
 
 ---
 
-## Priority 5: Pre-Launch Checklist
+## Expected Outcomes
 
-### 5.1 Legal & Compliance
-- [ ] Financial disclaimer on all analysis pages (exists but verify coverage)
-- [ ] Terms of Service review for investment advice disclaimers
-- [ ] Privacy policy GDPR compliance audit
-- [ ] Cookie consent banner if needed
+After implementation:
 
-### 5.2 SEO & Marketing
-- [ ] Meta tags on all public pages
-- [ ] OG images for social sharing
-- [ ] Sitemap.xml (exists at `/sitemap.xml`)
-- [ ] robots.txt optimization
+1. **Rate Limiting**: Prevents abuse and protects API quotas
+   - 429 responses with clear Retry-After headers
+   - Per-user limits for authenticated endpoints
+   - Per-IP limits for public endpoints
 
-### 5.3 Analytics
-- [ ] Page view tracking
-- [ ] Conversion funnel: Landing → Signup → Dashboard → Upgrade
-- [ ] Feature usage analytics
+2. **Error Monitoring**: Comprehensive visibility into failures
+   - Structured error logs with provider info
+   - Rolling window aggregation of error rates
+   - Frontend visibility into system health
 
-### 5.4 Testing
-- [ ] E2E tests for critical flows (auth, checkout, core features)
-- [ ] Load testing for market data endpoints
-- [ ] Cross-browser testing (Chrome, Firefox, Safari, Edge)
-- [ ] Accessibility audit (WCAG 2.1 AA)
+3. **Circuit Breaker**: Faster failures, automatic recovery
+   - Failing providers skipped immediately (no timeout wait)
+   - Automatic retry after recovery timeout
+   - Graceful degradation with clear UI messaging
 
-### 5.5 Infrastructure
-- [ ] Custom domain SSL verification
-- [ ] CDN caching headers for static assets
-- [ ] Database backup strategy confirmation
-- [ ] Uptime monitoring (Pingdom, UptimeRobot, etc.)
+4. **Database Optimization**: Faster query execution
+   - Index scans instead of sequential scans
+   - Reduced query latency for common patterns
+   - Better scalability as data grows
 
 ---
 
-## Implementation Roadmap
+## Deployment Order
 
-### Phase 1: Security Hardening (Week 1)
-| Task | Estimated Time |
-|------|----------------|
-| Fix email endpoint authentication | 3 hours |
-| Fix AI tutor token issue | 30 minutes |
-| Add email input validation | 1 hour |
-| Add academy_quizzes RLS policy | 15 minutes |
-| Add rate limiting to edge functions | 4 hours |
+1. **Phase 1**: Database indexes (no code changes needed)
+2. **Phase 2**: Create shared utilities (rate limit, circuit breaker, retry)
+3. **Phase 3**: Update edge functions with new middleware
+4. **Phase 4**: Deploy frontend monitoring enhancements
+5. **Phase 5**: Add API status banner to UI
 
-### Phase 2: Core Features (Weeks 2-3)
-| Task | Estimated Time |
-|------|----------------|
-| Implement price alerts system | 2 days |
-| Resolve intraday data provider | 6 hours |
-| Mobile responsiveness audit | 2 days |
-| Error monitoring integration | 3 hours |
-
-### Phase 3: Polish & Enhancement (Weeks 4-5)
-| Task | Estimated Time |
-|------|----------------|
-| Chart drawing tools | 3 days |
-| Two-factor authentication | 6 hours |
-| Chart sharing completion | 6 hours |
-| Performance optimization | 4 hours |
-
-### Phase 4: Launch Preparation (Week 6)
-| Task | Estimated Time |
-|------|----------------|
-| E2E testing suite | 2 days |
-| Legal/compliance review | 1 day |
-| Analytics integration | 4 hours |
-| Load testing | 4 hours |
-| Cross-browser/accessibility audit | 1 day |
-
----
-
-## Summary
-
-**Minimum Viable Production (MVP)**: Complete Priority 1 (security fixes) + Priority 5 (pre-launch checklist). This is approximately **1-2 weeks** of focused work.
-
-**Full Production Release**: Complete all priorities. This is approximately **5-6 weeks** of development time.
-
-The application has a strong foundation with authentication, billing, and core features already working. The primary gaps are security hardening, price alerts implementation, and comprehensive testing.
