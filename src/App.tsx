@@ -7,6 +7,8 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import ErrorBoundary from "@/components/common/ErrorBoundary";
 import PageLoader from "@/components/common/PageLoader";
+import { ApiStatusBanner } from "@/components/common/ApiStatusBanner";
+import { initWebVitals, initErrorTracking } from "@/utils/monitoring";
 
 // Lazy load route components for better performance
 const Index = lazy(() => import("./pages/Index"));
@@ -72,6 +74,15 @@ const RoutePrefetcher = () => {
   return null;
 };
 
+// Initialize monitoring on first render
+const MonitoringInitializer = () => {
+  useEffect(() => {
+    initWebVitals();
+    initErrorTracking();
+  }, []);
+  return null;
+};
+
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
@@ -80,7 +91,9 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <MonitoringInitializer />
             <RoutePrefetcher />
+            <ApiStatusBanner />
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/" element={<Index />} />

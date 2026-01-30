@@ -8,6 +8,17 @@ import {
   PREMIUM_FUNDAMENTAL_FIELDS,
   type SubscriptionTier 
 } from "../_shared/tierCheck.ts";
+import { 
+  rateLimitMiddleware, 
+  RATE_LIMITS 
+} from "../_shared/rateLimit.ts";
+import {
+  withCircuitBreaker,
+  DEFAULT_CIRCUIT_CONFIG,
+  getCircuitInfo,
+  CircuitState,
+} from "../_shared/circuitBreaker.ts";
+import { fetchWithRetry, LIGHT_RETRY_CONFIG } from "../_shared/retry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,6 +45,11 @@ function validateSymbols(symbols: unknown): symbols is string[] {
 function validateType(type: unknown): type is "quotes" | "candles" | "search" | "fundamentals" {
   return type === "quotes" || type === "candles" || type === "search" || type === "fundamentals";
 }
+
+// Circuit breaker configurations for each provider
+const FMP_CIRCUIT = { ...DEFAULT_CIRCUIT_CONFIG, name: "fmp-api" };
+const FINNHUB_CIRCUIT = { ...DEFAULT_CIRCUIT_CONFIG, name: "finnhub-api" };
+const ALPHA_VANTAGE_CIRCUIT = { ...DEFAULT_CIRCUIT_CONFIG, name: "alpha-vantage-api" };
 
 // ======================= In-memory candle cache =======================
 // TTL in milliseconds – synchronized with client cache for consistent behavior
@@ -166,6 +182,17 @@ serve(async (req) => {
     const userId = await getUserIdFromAuth(authHeader, supabaseUrl, anonKey);
     const tier: SubscriptionTier = userId ? await getUserTier(userId) : 'free';
 
+    // Apply rate limiting
+    const rateLimitResponse = rateLimitMiddleware(
+      req,
+      RATE_LIMITS.MARKET_DATA,
+      corsHeaders,
+      userId || undefined
+    );
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     console.log(`Market data request - userId: ${userId}, tier: ${tier}`);
 
     const { symbols, type, resolution, days } = await req.json();
@@ -197,6 +224,9 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Log circuit breaker states for monitoring
+    console.log(`Circuit states - FMP: ${getCircuitInfo("fmp-api").state}, Finnhub: ${getCircuitInfo("finnhub-api").state}, AV: ${getCircuitInfo("alpha-vantage-api").state}`);
 
     // Fetch quotes for multiple symbols - FMP primary, Finnhub fallback
     if (type === "quotes") {
