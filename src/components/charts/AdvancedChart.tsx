@@ -1,10 +1,11 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { Loader2, TrendingUp, TrendingDown, Search, AlertCircle, RefreshCw, Crosshair, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { StockSearch } from "@/components/dashboard/StockSearch";
 import { ChartToolbar } from "./ChartToolbar";
 import { IndicatorLegend } from "./IndicatorLegend";
+import { DrawingToolbar, type DrawingMode } from "./DrawingToolbar";
 import { PriceChart } from "./PriceChart";
 import { VolumeChart } from "./VolumeChart";
 import { RSIChart, MACDChart } from "./OscillatorChart";
@@ -15,6 +16,7 @@ import {
   ChartIndicator,
   defaultIndicators 
 } from "@/hooks/useChartData";
+import { useChartDrawings } from "@/hooks/useChartDrawings";
 import { useQuotes } from "@/hooks/useMarketData";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -29,9 +31,17 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
   const [indicators, setIndicators] = useState<ChartIndicator[]>(defaultIndicators);
   const [showSearch, setShowSearch] = useState(false);
   const [showCrosshair, setShowCrosshair] = useState(true);
+  const [drawingMode, setDrawingMode] = useState<DrawingMode>(null);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
 
   const { candles, loading, error, refetch, timeframeConfig } = useChartData(symbol, timeframe);
   const { quotes } = useQuotes([symbol]);
+  const { 
+    drawings, 
+    addDrawing, 
+    deleteDrawing, 
+    clearAllDrawings 
+  } = useChartDrawings(symbol, timeframe);
   
   const quote = quotes[0];
   const currentPrice = quote?.price || candles[candles.length - 1]?.close || 0;
@@ -102,9 +112,10 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="h-full flex flex-col p-4">
-        {/* Compact Header */}
-        <div className="flex items-center justify-between gap-3 mb-3">
+      {/* Mobile-responsive container */}
+      <div className="h-full flex flex-col p-2 sm:p-4">
+        {/* Compact Header - Mobile responsive */}
+        <div className="flex items-center justify-between gap-2 sm:gap-3 mb-2 sm:mb-3 flex-wrap">
           {/* Left: Symbol & Price */}
           <div className="flex items-center gap-3">
             <AnimatePresence mode="wait">
@@ -138,15 +149,16 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
 
             {!showSearch && (
               <div className="flex items-center gap-2">
-                <span className="font-mono text-lg font-bold tabular-nums">
+                <span className="font-mono text-base sm:text-lg font-bold tabular-nums">
                   ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <div className={cn(
-                  "flex items-center gap-1 font-mono text-[11px] px-1.5 py-0.5 rounded-md tabular-nums font-medium",
+                  "flex items-center gap-1 font-mono text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-md tabular-nums font-medium",
                   isPositive ? "bg-gain/15 text-gain" : "bg-loss/15 text-loss"
                 )}>
                   {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {isPositive ? "+" : ""}{priceChangePercent.toFixed(2)}%
+                  <span className="hidden sm:inline">{isPositive ? "+" : ""}{priceChangePercent.toFixed(2)}%</span>
+                  <span className="sm:hidden">{isPositive ? "+" : ""}{priceChangePercent.toFixed(1)}%</span>
                 </div>
               </div>
             )}
@@ -188,16 +200,16 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
           </div>
         </div>
 
-        {/* Timeframe & Indicators Row */}
-        <div className="flex items-center justify-between gap-2 mb-3">
-          {/* Timeframe Pills */}
-          <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-accent/40">
-            {(["4H", "1D", "1W", "1M", "3M", "1Y"] as TimeframeType[]).map((tf) => (
+        {/* Timeframe & Indicators Row - Scrollable on mobile */}
+        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-3 overflow-x-auto scrollbar-hide">
+          {/* Timeframe Pills - Compact on mobile */}
+          <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-accent/40 shrink-0">
+            {(["1H", "4H", "1D", "1W", "1M", "3M", "1Y"] as TimeframeType[]).map((tf) => (
               <button
                 key={tf}
                 onClick={() => setTimeframe(tf)}
                 className={cn(
-                  "px-2.5 py-1 text-[10px] font-mono font-semibold rounded-md transition-all",
+                  "px-2 py-1 text-[10px] font-mono font-semibold rounded-md transition-all",
                   timeframe === tf
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent/60"
@@ -207,6 +219,15 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
               </button>
             ))}
           </div>
+
+          {/* Drawing Tools */}
+          <DrawingToolbar
+            activeMode={drawingMode}
+            onModeChange={setDrawingMode}
+            onClearAll={clearAllDrawings}
+            drawingCount={drawings.length}
+            disabled={loading}
+          />
 
           {/* Active Indicators Legend + Toolbar */}
           <div className="flex items-center gap-2">
