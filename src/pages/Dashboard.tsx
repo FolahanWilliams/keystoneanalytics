@@ -68,9 +68,10 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background flex w-full">
       <DashboardSidebar />
       
-      <div className="flex-1 flex flex-col min-h-screen overflow-hidden md:ml-0">
+      {/* Main content with proper mobile spacing for hamburger menu */}
+      <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
         <MarketOverview />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 scrollbar-terminal">
+        <main className="flex-1 overflow-y-auto p-3 pt-14 md:pt-3 md:p-6 scrollbar-terminal">
           <Outlet context={{ urlSymbol }} />
         </main>
       </div>

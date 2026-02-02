@@ -28,18 +28,18 @@ const Analysis = () => {
 
   return (
     <motion.div 
-      className="space-y-4"
+      className="space-y-3 sm:space-y-4"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
     >
-      {/* Page Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <BarChart3 className="w-4 h-4 text-primary" />
+      {/* Page Header - Mobile optimized */}
+      <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
           </div>
-          <h1 className="text-lg font-semibold tracking-tight">Technical Analysis</h1>
+          <h1 className="text-base sm:text-lg font-semibold tracking-tight">Technical Analysis</h1>
         </div>
         <div className="w-full sm:w-56">
           <StockSearch 
@@ -49,14 +49,15 @@ const Analysis = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
-        {/* Main Chart */}
+      {/* Responsive grid - Stack on mobile, side-by-side on xl */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 sm:gap-4">
+        {/* Main Chart - Full width on mobile */}
         <div className="xl:col-span-8">
           <BentoModule 
             size="hero" 
             noHeader 
             noPadding
-            className="min-h-[580px]"
+            className="min-h-[400px] sm:min-h-[500px] lg:min-h-[580px]"
           >
             <AdvancedChart 
               symbol={selectedSymbol} 
