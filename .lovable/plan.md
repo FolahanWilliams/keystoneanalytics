@@ -1,129 +1,211 @@
-# Priority 2: Core Functionality Gaps - COMPLETED
 
-## Overview
 
-Priority 2 implements three core functionality gaps: intraday chart data (1H timeframe), chart drawing tools with persistence, and mobile responsiveness improvements.
+# Chart Features & Codebase Deep Analysis - Implementation Plan
+
+## Summary
+
+After a thorough analysis of the codebase, I've identified several critical issues that prevent chart drawing features from working, along with static/hardcoded values that should be dynamic, and other improvements to enhance the production readiness.
 
 ---
 
-## Completed Work
+## Critical Issues Found
 
-### 2.1 Intraday Chart Data ✅
+### Issue 1: ChartDrawingLayer Not Integrated (CRITICAL)
+
+The `ChartDrawingLayer` component exists (`src/components/charts/ChartDrawingLayer.tsx`) but is **never imported or used** in `AdvancedChart.tsx`. This means:
+- The drawing toolbar appears and is interactive
+- Drawings are being saved to the database correctly
+- **But drawings are never rendered on the chart**
+
+**Evidence:**
+- `AdvancedChart.tsx` imports `DrawingToolbar` and `useChartDrawings` hook
+- It passes `drawings`, `addDrawing`, `deleteDrawing`, `clearAllDrawings` to state
+- But `ChartDrawingLayer` is never imported or rendered
+
+**Fix Required:** Import and render `ChartDrawingLayer` in `AdvancedChart.tsx`, positioned as an overlay on the `PriceChart`.
+
+---
+
+### Issue 2: PriceChart Doesn't Expose Chart API Reference
+
+The `ChartDrawingLayer` component requires a reference to the lightweight-charts `IChartApi` to:
+- Convert mouse coordinates to price/time values
+- Render drawings at correct chart positions
+- Sync with chart zoom/pan
+
+**Current state:** `PriceChart` creates the chart internally but doesn't expose `chartRef` to parent components.
+
+**Fix Required:** 
+1. Modify `PriceChart` to accept a `forwardRef` or callback to expose the `IChartApi`
+2. Pass this reference to `ChartDrawingLayer`
+
+---
+
+### Issue 3: Static/Hardcoded Values in Dashboard Overview
+
+The Overview page has hardcoded fallback values that may display stale data:
+
+```typescript
+// src/pages/dashboard/Overview.tsx, lines 100-123
+value: "18.42"    // VIX Index - should be fetched dynamically
+value: "65"       // Fear & Greed Index - hardcoded
+value: "+0.42%"   // S&P 500 - should use live quote data
+```
+
+**Fix Required:** Connect these values to live market data via `useQuotes` hook.
+
+---
+
+### Issue 4: ChartDrawingLayer Uses Private Chart API
+
+The drawing layer attempts to access internal chart series via:
+```typescript
+const series = (chart as any)._private__seriesMap?.values()?.next()?.value;
+```
+
+This is fragile and may break with library updates.
+
+**Fix Required:** Use the public lightweight-charts API by passing the candlestick series reference from `PriceChart`.
+
+---
+
+## Static Data Audit
+
+| Location | Issue | Priority |
+|----------|-------|----------|
+| `Overview.tsx:101` | VIX "18.42" hardcoded | High |
+| `Overview.tsx:112` | Fear & Greed "65" hardcoded | Medium |
+| `Overview.tsx:123` | S&P 500 "+0.42%" hardcoded | High |
+| `MarketOverview.tsx:8` | `MARKET_SYMBOLS` hardcoded | Low (acceptable) |
+| `Coach.tsx:13` | `FEATURED_STOCKS` hardcoded | Low (acceptable) |
+| `AddAssetDialog.tsx:16` | `POPULAR_STOCKS` hardcoded | Low (acceptable) |
+
+---
+
+## Implementation Plan
+
+### Task 1: Fix Chart Drawing Integration
+
+**Files to modify:**
+- `src/components/charts/PriceChart.tsx`
+- `src/components/charts/AdvancedChart.tsx`
+- `src/components/charts/ChartDrawingLayer.tsx`
 
 **Changes:**
-- Added 1H (1-hour) timeframe to `src/config/timeframes.ts` with 7-day window (168 hourly bars)
-- Updated `TimeframeType` in `src/types/market.ts` to include "1H"
-- Market-data edge function already supports 60-minute resolution via FMP API
-- UI updated in AdvancedChart to show 1H, 4H, 1D, 1W, 1M, 3M, 1Y timeframes
 
-### 2.2 Chart Drawing Tools ✅
+1. **PriceChart.tsx** - Expose chart and series references:
+   - Add `onChartReady` callback prop
+   - Call this with `chartRef` and `candleSeriesRef` when chart is initialized
+   - Handle cleanup properly
 
-**Database:**
-- Created `chart_drawings` table with RLS policies for user-specific drawings
-- Supports: trendline, fibonacci, horizontal, annotation drawing types
-- Indexed on (user_id, symbol, timeframe) for efficient queries
+2. **AdvancedChart.tsx** - Wire up the drawing layer:
+   - Import `ChartDrawingLayer`
+   - Add state for chart API reference
+   - Render `ChartDrawingLayer` as absolute overlay within chart container
+   - Pass required props: `chart`, `drawings`, `activeMode`, `onAddDrawing`, `onDeleteDrawing`, `containerRef`
 
-**New Files:**
-- `src/types/market.ts` - Added ChartDrawing, DrawingType, DrawingData types
-- `src/hooks/useChartDrawings.ts` - CRUD operations for chart drawings with Supabase
-- `src/components/charts/DrawingToolbar.tsx` - Toolbar with drawing tool buttons
-- `src/components/charts/ChartDrawingLayer.tsx` - SVG overlay for rendering drawings
+3. **ChartDrawingLayer.tsx** - Use public API:
+   - Accept `candleSeries` prop instead of extracting from private map
+   - Use `series.coordinateToPrice()` and `series.priceToCoordinate()` with the passed series
 
-**Features:**
-- Trend lines: Click-drag to draw between two price/time points
-- Horizontal lines: Single click to add support/resistance levels
-- Fibonacci retracements: Drag to define high/low range, auto-draws 0%, 23.6%, 38.2%, 50%, 61.8%, 78.6%, 100% levels
-- Text annotations: Click to add text labels on chart
-- All drawings persist to database per symbol/timeframe
-- Clear all drawings button
+---
 
-### 2.3 Mobile Responsiveness ✅
+### Task 2: Replace Hardcoded Dashboard Values
+
+**Files to modify:**
+- `src/pages/dashboard/Overview.tsx`
 
 **Changes:**
-- `src/components/ui/dialog.tsx` - Mobile-friendly sizing with max-height scroll
-- `src/pages/Dashboard.tsx` - Added padding for mobile hamburger menu
-- `src/components/charts/AdvancedChart.tsx` - Responsive padding, text sizes, scrollable timeframe row
-- `src/pages/dashboard/Analysis.tsx` - Responsive grid spacing and minimum heights
 
-**Improvements:**
-- Dialog modals now respect mobile screen bounds with proper scroll
-- Dashboard content has top padding to not overlap hamburger menu
-- Chart timeframe pills are horizontally scrollable on mobile
-- Price/percentage display adapts to smaller screens
-- Analysis page chart container has responsive height
+1. Add `useQuotes` hook for VIX and SPY data:
+```typescript
+const { quotes: marketQuotes } = useQuotes(["VIX", "SPY"]);
+const vixQuote = marketQuotes.find(q => q.symbol === "VIX");
+const spyQuote = marketQuotes.find(q => q.symbol === "SPY");
+```
+
+2. Replace hardcoded values with live data:
+```typescript
+value: vixQuote?.price?.toFixed(2) ?? "..."  // VIX
+value: spyQuote ? `${spyQuote.change >= 0 ? '+' : ''}${spyQuote.changePercent.toFixed(2)}%` : "..."
+```
+
+3. For Fear & Greed Index - this requires an external API (CNN). Options:
+   - Create a new edge function to fetch from alternative sources
+   - Or mark as "Coming Soon" until API is integrated
 
 ---
 
-## Technical Implementation Notes
+### Task 3: Add Keyboard Shortcuts for Drawing Tools
 
-### Drawing Layer Architecture
+The `DrawingToolbar` already defines shortcuts (V, T, H, F, A) but they're not functional.
 
-The chart drawing system uses an SVG overlay on top of the lightweight-charts canvas:
+**Files to modify:**
+- `src/components/charts/AdvancedChart.tsx`
 
-```
-┌─────────────────────────────────┐
-│  ChartDrawingLayer (SVG)        │ ← z-index: 10, captures mouse events
-├─────────────────────────────────┤
-│  PriceChart (Canvas)            │ ← lightweight-charts library
-├─────────────────────────────────┤
-│  VolumeChart, RSI, MACD         │
-└─────────────────────────────────┘
-```
-
-The drawing layer:
-1. Converts mouse coordinates to chart price/time values
-2. Stores drawings in Supabase with JSON data for flexibility
-3. Re-renders SVG elements when chart scrolls/zooms (future enhancement)
-
-### Mobile Breakpoints
-
-Following Tailwind's default breakpoints:
-- `sm`: 640px and up
-- `md`: 768px and up
-- `lg`: 1024px and up
-- `xl`: 1280px and up
-
----
-
-## Files Changed
-
-| File | Type | Description |
-|------|------|-------------|
-| `src/config/timeframes.ts` | Modified | Added 1H timeframe |
-| `src/types/market.ts` | Modified | Added drawing types |
-| `src/hooks/useChartDrawings.ts` | New | Drawing CRUD hook |
-| `src/components/charts/DrawingToolbar.tsx` | New | Drawing tool buttons |
-| `src/components/charts/ChartDrawingLayer.tsx` | New | SVG drawing renderer |
-| `src/components/charts/AdvancedChart.tsx` | Modified | Integrated drawings, 1H, mobile |
-| `src/pages/dashboard/Analysis.tsx` | Modified | Mobile responsiveness |
-| `src/pages/Dashboard.tsx` | Modified | Mobile padding |
-| `src/components/ui/dialog.tsx` | Modified | Mobile sizing |
-
-### Database Migration
-
-```sql
-CREATE TABLE public.chart_drawings (
-  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID NOT NULL,
-  symbol TEXT NOT NULL,
-  timeframe TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('trendline', 'fibonacci', 'horizontal', 'annotation')),
-  data JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
-);
-
--- RLS: Users can only manage their own drawings
--- Index: (user_id, symbol, timeframe) for efficient queries
+**Changes:**
+Add `useEffect` for keyboard event listener:
+```typescript
+useEffect(() => {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.target instanceof HTMLInputElement) return;
+    const key = e.key.toUpperCase();
+    const shortcuts: Record<string, DrawingMode> = {
+      'V': 'select', 'T': 'trendline', 'H': 'horizontal',
+      'F': 'fibonacci', 'A': 'annotation', 'ESCAPE': null
+    };
+    if (key in shortcuts || key === 'ESCAPE') {
+      setDrawingMode(shortcuts[key] ?? null);
+    }
+  };
+  window.addEventListener('keydown', handleKeyDown);
+  return () => window.removeEventListener('keydown', handleKeyDown);
+}, []);
 ```
 
 ---
 
-## Next Steps
+### Task 4: Minor Fixes & Improvements
 
-With Priority 2 complete, remaining roadmap items:
+| Fix | File | Description |
+|-----|------|-------------|
+| Drawing deletion feedback | `ChartDrawingLayer.tsx` | Add visual hover state and confirmation |
+| Clear container ref | `AdvancedChart.tsx` | Use `chartContainerRef` which is created but never used |
+| Mobile drawing touch support | `ChartDrawingLayer.tsx` | Add `onTouchStart`/`onTouchEnd` handlers |
 
-1. **Price Alerts System** - Database table, background checks, notification delivery
-2. **Two-Factor Authentication** - Enhanced account security
-3. **Chart Sharing** - Export and share chart configurations
-4. **Social Features** - Community watchlists, discussion threads
+---
+
+## File Changes Summary
+
+| File | Action | Changes |
+|------|--------|---------|
+| `PriceChart.tsx` | Modify | Add `onChartReady` callback, expose refs |
+| `AdvancedChart.tsx` | Modify | Import/render ChartDrawingLayer, add keyboard shortcuts, use container ref |
+| `ChartDrawingLayer.tsx` | Modify | Accept series prop, improve coordinate conversion |
+| `Overview.tsx` | Modify | Replace hardcoded VIX/SPY with live quotes |
+
+---
+
+## Testing Checklist
+
+After implementation, verify:
+
+1. **Drawing Tools:**
+   - [ ] Select tool (V) - hover/click drawings
+   - [ ] Trend line (T) - click-drag to create
+   - [ ] Horizontal line (H) - single click to place
+   - [ ] Fibonacci (F) - click-drag for retracement levels
+   - [ ] Annotation (A) - click to add text
+   - [ ] Clear all button removes all drawings
+   - [ ] Drawings persist across page refreshes
+   - [ ] Drawings sync with correct symbol/timeframe
+
+2. **Live Data:**
+   - [ ] VIX shows current value
+   - [ ] S&P 500 shows current change %
+   - [ ] Values update on refresh
+
+3. **Keyboard Shortcuts:**
+   - [ ] All shortcuts (V, T, H, F, A, Escape) work
+   - [ ] Shortcuts don't trigger when typing in search
+
