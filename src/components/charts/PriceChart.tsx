@@ -19,6 +19,8 @@ interface PriceChartProps {
   indicators: ChartIndicator[];
   showCrosshair: boolean;
   height?: number;
+  /** Callback when chart and series are ready for drawing tools */
+  onChartReady?: (chart: IChartApi, series: ISeriesApi<"Candlestick">) => void;
 }
 
 function PriceChartComponent({
@@ -27,6 +29,7 @@ function PriceChartComponent({
   indicators,
   showCrosshair,
   height = 350,
+  onChartReady,
 }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -245,6 +248,9 @@ function PriceChartComponent({
     bbLowerSeriesRef.current = bbLowerSeries;
     vwapSeriesRef.current = vwapSeries;
 
+    // Notify parent that chart is ready for drawing tools
+    onChartReady?.(chart, candleSeries);
+
     const handleResize = () => {
       if (!containerRef.current || !chartRef.current) return;
       chartRef.current.applyOptions({ width: containerRef.current.clientWidth });
@@ -255,6 +261,8 @@ function PriceChartComponent({
 
     return () => {
       ro.disconnect();
+      // Notify parent that chart is being destroyed
+      onChartReady?.(null as unknown as IChartApi, null as unknown as ISeriesApi<"Candlestick">);
       chart.remove();
       chartRef.current = null;
       candleSeriesRef.current = null;
@@ -267,7 +275,7 @@ function PriceChartComponent({
       bbLowerSeriesRef.current = null;
       vwapSeriesRef.current = null;
     };
-  }, [height]);
+  }, [height, onChartReady]);
 
   // Crosshair toggle
   useEffect(() => {

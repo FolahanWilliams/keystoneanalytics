@@ -5,11 +5,18 @@ import EconomicIndicators from "@/components/dashboard/EconomicIndicators";
 import { MarketStatusIndicator } from "@/components/dashboard/MarketStatusIndicator";
 import { Activity, Zap, BarChart3, TrendingUp, LineChart, Brain, Globe, ArrowRight, Percent, Building } from "lucide-react";
 import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 import { useFredData } from "@/hooks/useFredData";
+import { useQuotes } from "@/hooks/useMarketData";
 
 const Overview = () => {
   const navigate = useNavigate();
   const { indicators, loading: fredLoading } = useFredData();
+  
+  // Live market data for VIX and SPY
+  const { quotes: marketQuotes, loading: quotesLoading } = useQuotes(["VIX", "SPY"]);
+  const vixQuote = marketQuotes.find(q => q.symbol === "VIX");
+  const spyQuote = marketQuotes.find(q => q.symbol === "SPY");
 
   // Quick action cards for navigation
   const quickActions = [
@@ -98,7 +105,9 @@ const Overview = () => {
           </div>
           <div>
             <p className="data-label">VIX Index</p>
-            <p className="text-sm font-semibold font-mono text-foreground tabular-nums">18.42</p>
+            <p className="text-sm font-semibold font-mono text-foreground tabular-nums">
+              {quotesLoading ? "..." : vixQuote?.price?.toFixed(2) ?? "--"}
+            </p>
           </div>
         </div>
         
@@ -120,7 +129,12 @@ const Overview = () => {
           </div>
           <div>
             <p className="data-label">S&P 500</p>
-            <p className="text-sm font-semibold font-mono text-gain tabular-nums">+0.42%</p>
+            <p className={cn(
+              "text-sm font-semibold font-mono tabular-nums",
+              spyQuote ? (spyQuote.change >= 0 ? "text-gain" : "text-loss") : "text-foreground"
+            )}>
+              {quotesLoading ? "..." : spyQuote ? `${spyQuote.change >= 0 ? '+' : ''}${spyQuote.changePercent.toFixed(2)}%` : "--"}
+            </p>
           </div>
         </div>
       </motion.div>

@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import type { IChartApi, Time } from "lightweight-charts";
+import type { IChartApi, ISeriesApi, Time } from "lightweight-charts";
 import type { ChartDrawing, DrawingData } from "@/types/market";
 import type { DrawingMode } from "./DrawingToolbar";
 
@@ -8,11 +8,13 @@ const FIBONACCI_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 
 interface ChartDrawingLayerProps {
   chart: IChartApi | null;
+  /** The candlestick series - passed from parent to avoid private API access */
+  candleSeries: ISeriesApi<"Candlestick"> | null;
   drawings: ChartDrawing[];
   activeMode: DrawingMode;
   onAddDrawing: (type: ChartDrawing["type"], data: DrawingData) => Promise<ChartDrawing | null>;
   onDeleteDrawing: (id: string) => Promise<boolean>;
-  containerRef: React.RefObject<HTMLDivElement>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
 interface PriceLineRef {
@@ -22,6 +24,7 @@ interface PriceLineRef {
 
 function ChartDrawingLayerComponent({
   chart,
+  candleSeries,
   drawings,
   activeMode,
   onAddDrawing,
@@ -89,19 +92,16 @@ function ChartDrawingLayerComponent({
   // Handle mouse events for drawing
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (!chart || !activeMode || activeMode === "select") return;
+      if (!chart || !candleSeries || !activeMode || activeMode === "select") return;
       if (!containerRef.current) return;
 
       const rect = containerRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      // Convert to chart coordinates
+      // Convert to chart coordinates using public API
       const timeCoord = chart.timeScale().coordinateToTime(x);
-      const series = (chart as any)._private__seriesMap?.values()?.next()?.value;
-      if (!series) return;
-
-      const priceCoord = series.coordinateToPrice(y);
+      const priceCoord = candleSeries.coordinateToPrice(y);
 
       if (activeMode === "horizontal") {
         // Single click creates horizontal line
@@ -132,26 +132,19 @@ function ChartDrawingLayerComponent({
         setStartPoint({ price: priceCoord, time: timeCoord as Time });
       }
     },
-    [chart, activeMode, containerRef, onAddDrawing]
+    [chart, candleSeries, activeMode, containerRef, onAddDrawing]
   );
 
   const handleMouseUp = useCallback(
     async (e: React.MouseEvent) => {
-      if (!chart || !isDrawing || !startPoint || !containerRef.current) return;
+      if (!chart || !candleSeries || !isDrawing || !startPoint || !containerRef.current) return;
 
       const rect = containerRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
       const endTime = chart.timeScale().coordinateToTime(x);
-      const series = (chart as any)._private__seriesMap?.values()?.next()?.value;
-      if (!series) {
-        setIsDrawing(false);
-        setStartPoint(null);
-        return;
-      }
-
-      const endPrice = series.coordinateToPrice(y);
+      const endPrice = candleSeries.coordinateToPrice(y);
 
       if (activeMode === "trendline") {
         await onAddDrawing("trendline", {
@@ -176,20 +169,88 @@ function ChartDrawingLayerComponent({
       setIsDrawing(false);
       setStartPoint(null);
     },
-    [chart, isDrawing, startPoint, activeMode, containerRef, onAddDrawing]
+    [chart, candleSeries, isDrawing, startPoint, activeMode, containerRef, onAddDrawing]
+  );
+
+  // Handle touch events for mobile
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (!chart || !candleSeries || !activeMode || activeMode === "select") return;
+      if (!containerRef.current) return;
+      if (e.touches.length !== 1) return;
+
+      const touch = e.touches[0];
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
+
+      const timeCoord = chart.timeScale().coordinateToTime(x);
+      const priceCoord = candleSeries.coordinateToPrice(y);
+
+      if (activeMode === "horizontal") {
+        onAddDrawing("horizontal", {
+          price: priceCoord,
+          color: "hsl(var(--primary))",
+          lineWidth: 1,
+        });
+        return;
+      }
+
+      if (activeMode === "trendline" || activeMode === "fibonacci") {
+        setIsDrawing(true);
+        setStartPoint({ price: priceCoord, time: timeCoord as Time });
+      }
+    },
+    [chart, candleSeries, activeMode, containerRef, onAddDrawing]
+  );
+
+  const handleTouchEnd = useCallback(
+    async (e: React.TouchEvent) => {
+      if (!chart || !candleSeries || !isDrawing || !startPoint || !containerRef.current) return;
+      if (e.changedTouches.length !== 1) return;
+
+      const touch = e.changedTouches[0];
+      const rect = containerRef.current.getBoundingClientRect();
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
+
+      const endTime = chart.timeScale().coordinateToTime(x);
+      const endPrice = candleSeries.coordinateToPrice(y);
+
+      if (activeMode === "trendline") {
+        await onAddDrawing("trendline", {
+          startPrice: startPoint.price,
+          startTime: startPoint.time as string,
+          endPrice,
+          endTime: endTime as string,
+          color: "hsl(var(--primary))",
+          lineWidth: 2,
+        });
+      } else if (activeMode === "fibonacci") {
+        await onAddDrawing("fibonacci", {
+          highPrice: Math.max(startPoint.price, endPrice),
+          lowPrice: Math.min(startPoint.price, endPrice),
+          highTime: startPoint.price > endPrice ? (startPoint.time as string) : (endTime as string),
+          lowTime: startPoint.price <= endPrice ? (startPoint.time as string) : (endTime as string),
+          levels: FIBONACCI_LEVELS,
+          color: "hsl(var(--primary))",
+        });
+      }
+
+      setIsDrawing(false);
+      setStartPoint(null);
+    },
+    [chart, candleSeries, isDrawing, startPoint, activeMode, containerRef, onAddDrawing]
   );
 
   // Render SVG overlay for trendlines and fibonacci
   const renderDrawings = useCallback(() => {
-    if (!chart || !containerRef.current) return null;
+    if (!chart || !candleSeries || !containerRef.current) return null;
 
     const trendlines = drawings.filter((d) => d.type === "trendline");
     const fibonaccis = drawings.filter((d) => d.type === "fibonacci");
     const annotations = drawings.filter((d) => d.type === "annotation");
     const horizontals = drawings.filter((d) => d.type === "horizontal");
-
-    const series = (chart as any)._private__seriesMap?.values()?.next()?.value;
-    if (!series) return null;
 
     return (
       <>
@@ -200,8 +261,8 @@ function ChartDrawingLayerComponent({
 
           const x1 = chart.timeScale().timeToCoordinate(startTime as Time);
           const x2 = chart.timeScale().timeToCoordinate(endTime as Time);
-          const y1 = series.priceToCoordinate(startPrice);
-          const y2 = series.priceToCoordinate(endPrice);
+          const y1 = candleSeries.priceToCoordinate(startPrice);
+          const y2 = candleSeries.priceToCoordinate(endPrice);
 
           if (x1 === null || x2 === null || y1 === null || y2 === null) return null;
 
@@ -254,7 +315,7 @@ function ChartDrawingLayerComponent({
             <g key={drawing.id}>
               {levels.map((level) => {
                 const price = highPrice - priceRange * level;
-                const y = series.priceToCoordinate(price);
+                const y = candleSeries.priceToCoordinate(price);
                 if (y === null) return null;
 
                 return (
@@ -283,11 +344,11 @@ function ChartDrawingLayerComponent({
               {/* Click to delete */}
               <rect
                 x={xMin}
-                y={series.priceToCoordinate(highPrice) || 0}
+                y={candleSeries.priceToCoordinate(highPrice) || 0}
                 width={width}
                 height={Math.abs(
-                  (series.priceToCoordinate(lowPrice) || 0) -
-                    (series.priceToCoordinate(highPrice) || 0)
+                  (candleSeries.priceToCoordinate(lowPrice) || 0) -
+                    (candleSeries.priceToCoordinate(highPrice) || 0)
                 )}
                 fill="transparent"
                 className="cursor-pointer"
@@ -302,7 +363,7 @@ function ChartDrawingLayerComponent({
           const { price, color } = drawing.data;
           if (!price) return null;
 
-          const y = series.priceToCoordinate(price);
+          const y = candleSeries.priceToCoordinate(price);
           if (y === null) return null;
 
           const width = containerRef.current?.clientWidth || 800;
@@ -338,7 +399,7 @@ function ChartDrawingLayerComponent({
           if (!text || !time || !price) return null;
 
           const x = chart.timeScale().timeToCoordinate(time as Time);
-          const y = series.priceToCoordinate(price);
+          const y = candleSeries.priceToCoordinate(price);
 
           if (x === null || y === null) return null;
 
@@ -370,7 +431,7 @@ function ChartDrawingLayerComponent({
         })}
       </>
     );
-  }, [chart, drawings, containerRef, onDeleteDrawing]);
+  }, [chart, candleSeries, drawings, containerRef, onDeleteDrawing]);
 
   return (
     <svg
@@ -388,6 +449,8 @@ function ChartDrawingLayerComponent({
       }}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       {renderDrawings()}
     </svg>

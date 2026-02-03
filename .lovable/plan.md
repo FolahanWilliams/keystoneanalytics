@@ -191,21 +191,23 @@ useEffect(() => {
 After implementation, verify:
 
 1. **Drawing Tools:**
-   - [ ] Select tool (V) - hover/click drawings
-   - [ ] Trend line (T) - click-drag to create
-   - [ ] Horizontal line (H) - single click to place
-   - [ ] Fibonacci (F) - click-drag for retracement levels
-   - [ ] Annotation (A) - click to add text
-   - [ ] Clear all button removes all drawings
-   - [ ] Drawings persist across page refreshes
-   - [ ] Drawings sync with correct symbol/timeframe
+   - [x] Select tool (V) - hover/click drawings
+   - [x] Trend line (T) - click-drag to create
+   - [x] Horizontal line (H) - single click to place
+   - [x] Fibonacci (F) - click-drag for retracement levels
+   - [x] Annotation (A) - click to add text
+   - [x] Clear all button removes all drawings
+   - [x] Drawings persist across page refreshes
+   - [x] Drawings sync with correct symbol/timeframe
 
 2. **Live Data:**
-   - [ ] VIX shows current value
-   - [ ] S&P 500 shows current change %
-   - [ ] Values update on refresh
+   - [x] VIX shows current value
+   - [x] S&P 500 shows current change %
+   - [x] Values update on refresh
 
 3. **Keyboard Shortcuts:**
-   - [ ] All shortcuts (V, T, H, F, A, Escape) work
-   - [ ] Shortcuts don't trigger when typing in search
+   - [x] All shortcuts (V, T, H, F, A, Escape) work
+   - [x] Shortcuts don't trigger when typing in search
+
+## Status: COMPLETED (2026-02-03)
 

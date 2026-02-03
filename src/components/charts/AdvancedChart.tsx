@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Loader2, TrendingUp, TrendingDown, Search, AlertCircle, RefreshCw, Crosshair, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -6,6 +6,7 @@ import { StockSearch } from "@/components/dashboard/StockSearch";
 import { ChartToolbar } from "./ChartToolbar";
 import { IndicatorLegend } from "./IndicatorLegend";
 import { DrawingToolbar, type DrawingMode } from "./DrawingToolbar";
+import { ChartDrawingLayer } from "./ChartDrawingLayer";
 import { PriceChart } from "./PriceChart";
 import { VolumeChart } from "./VolumeChart";
 import { RSIChart, MACDChart } from "./OscillatorChart";
@@ -20,6 +21,7 @@ import { useChartDrawings } from "@/hooks/useChartDrawings";
 import { useQuotes } from "@/hooks/useMarketData";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { IChartApi, ISeriesApi } from "lightweight-charts";
 
 interface AdvancedChartProps {
   symbol?: string;
@@ -33,6 +35,8 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
   const [showCrosshair, setShowCrosshair] = useState(true);
   const [drawingMode, setDrawingMode] = useState<DrawingMode>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [chartApi, setChartApi] = useState<IChartApi | null>(null);
+  const [candleSeries, setCandleSeries] = useState<ISeriesApi<"Candlestick"> | null>(null);
 
   const { candles, loading, error, refetch, timeframeConfig } = useChartData(symbol, timeframe);
   const { quotes } = useQuotes([symbol]);
@@ -51,7 +55,45 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
 
   const enrichedData = useEnrichedChartData(candles, indicators);
 
-  // Calculate minimum data required for enabled indicators
+  // Keyboard shortcuts for drawing tools
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      const key = e.key.toUpperCase();
+      const shortcuts: Record<string, DrawingMode> = {
+        'V': 'select',
+        'T': 'trendline',
+        'H': 'horizontal',
+        'F': 'fibonacci',
+        'A': 'annotation',
+      };
+      
+      if (key === 'ESCAPE') {
+        setDrawingMode(null);
+        return;
+      }
+      
+      if (key in shortcuts) {
+        setDrawingMode(shortcuts[key]);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Handle chart ready callback
+  const handleChartReady = useCallback((chart: IChartApi, series: ISeriesApi<"Candlestick">) => {
+    if (chart && series) {
+      setChartApi(chart);
+      setCandleSeries(series);
+    } else {
+      setChartApi(null);
+      setCandleSeries(null);
+    }
+  }, []);
   const minDataRequired = useMemo(() => {
     let min = 1;
     if (indicators.find(i => i.id === "sma20")?.enabled) min = Math.max(min, 20);
@@ -277,14 +319,25 @@ export function AdvancedChart({ symbol = "AAPL", onSymbolChange }: AdvancedChart
           )}
 
           {enrichedData.length > 0 ? (
-            <div className="h-full flex flex-col">
-              <div className="flex-1 min-h-0">
+            <div className="h-full flex flex-col" ref={chartContainerRef}>
+              <div className="flex-1 min-h-0 relative">
                 <PriceChart
                   data={enrichedData}
                   currentPrice={currentPrice}
                   indicators={indicators}
                   showCrosshair={showCrosshair}
                   height={priceChartHeight}
+                  onChartReady={handleChartReady}
+                />
+                {/* Drawing layer overlay */}
+                <ChartDrawingLayer
+                  chart={chartApi}
+                  candleSeries={candleSeries}
+                  drawings={drawings}
+                  activeMode={drawingMode}
+                  onAddDrawing={addDrawing}
+                  onDeleteDrawing={deleteDrawing}
+                  containerRef={chartContainerRef}
                 />
               </div>
               <VolumeChart data={enrichedData} height={40} />
